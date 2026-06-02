@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id              String            @id @default(cuid())
+  email           String            @unique
+  name            String?
+  imageUrl        String?
+  passwordHash    String
+  workspaceMember WorkspaceMember[]
+  conversations   Conversation[]
+  usageEvents     UsageEvent[]
+  uploadedDocuments Document[]      @relation("DocumentUploadedBy")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Workspace {
+  id            String            @id @default(cuid())
+  name          String
+  slug          String            @unique
+  members       WorkspaceMember[]
+  conversations Conversation[]
+  usageEvents   UsageEvent[]
+  documents     Document[]
+  documentChunks DocumentChunk[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model WorkspaceMember {
+  id          String          @id @default(cuid())
+  role        WorkspaceRole   @default(MEMBER)
+  userId      String
+  workspaceId String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model Conversation {
+  id          String    @id @default(cuid())
+  title       String?
+  metadata    Json?
+  workspaceId String
+  userId      String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+  usageEvents UsageEvent[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([workspaceId, userId, createdAt])
+}
+
+model Message {
+  id             String          @id @default(cuid())
+  role           MessageRole
+  content        String
+  metadata       Json?
+  conversationId String
+  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([conversationId, createdAt])
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+  tool
+}
+
+model UsageEvent {
+  id             String           @id @default(cuid())
+  userId         String
+  workspaceId    String
+  conversationId String?
+  provider       String
+  model          String
+  inputTokens    Int              @default(0)
+  outputTokens   Int              @default(0)
+  totalTokens    Int              @default(0)
+  latencyMs      Int
+  status         UsageEventStatus
+  errorCode      String?
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace      Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  conversation   Conversation?    @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([conversationId])
+  @@index([createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+enum UsageEventStatus {
+  success
+  error
+}
+
+model Document {
+  id           String         @id @default(cuid())
+  filename     String
+  contentType  String
+  size         Int
+  storageKey   String         @unique
+  status       DocumentStatus @default(uploaded)
+  uploadedById String
+  workspaceId  String
+  uploadedBy   User           @relation("DocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  chunks       DocumentChunk[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  @@index([workspaceId])
+  @@index([uploadedById])
+  @@index([createdAt])
+  @@index([workspaceId, createdAt])
+}
+
+enum DocumentStatus {
+  uploaded
+  processing
+  ready
+  failed
+}
+
+model DocumentChunk {
+  id          String                  @id @default(cuid())
+  documentId  String
+  workspaceId String
+  chunkIndex  Int
+  content     String
+  metadata    Json?
+  embedding   Unsupported("vector(1536)")?
+  document    Document                @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@index([workspaceId])
+  @@index([workspaceId, documentId])
+}

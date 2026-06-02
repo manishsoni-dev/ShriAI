@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
+/storage
+node_modules/
+.env
+.env.*
+!.env.example
+dist/
+build/
+.next/
+.venv/
+venv/
+__pycache__/
+*.log
+.idea/
+.vscode/
