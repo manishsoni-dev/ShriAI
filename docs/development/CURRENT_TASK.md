@@ -156,6 +156,8 @@ git status --short
 - Preserved unrelated UI/audio/persona WIP in Git stashes:
   `preserve unrelated UI audio persona WIP before Prompt 1-3 closeout` and
   `preserve remaining UI audio persona WIP before Prompt 1-3 closeout`.
+- Updated Notion roadmap plus Prompt 1, Prompt 2, and Prompt 3 pages with the
+  verified closeout status and local validation summary.
 
 ### Files Changed
 
@@ -173,9 +175,13 @@ git status --short
 - Do not push local commits during this task; remote CI verification remains a
   follow-up unless publishing is explicitly requested.
 - Do not claim credential rotation completion from repository evidence.
+- Keep remote CI and credential rotation as explicit external follow-ups, not
+  hidden assumptions.
 
 ### Tests Run
 
+- `npm ci`: passed after closeout commit; reported existing npm audit advisories
+  that are out of scope for this task.
 - `npm run test`: 90 tests passed across 14 test files.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
@@ -200,12 +206,16 @@ git status --short
 
 ### Remaining Blockers
 
+- None for local Prompt 1-3 closeout.
+
+### External Follow-Ups
+
 - Remote GitHub CI is unverified because local commits have not been pushed and
   no GitHub Actions runs were listed.
 - Credential rotation completion is not verifiable from repository state.
 
 ### Recommended Next Task
 
-- Update Notion Prompt 1/2/3 status from the verified local evidence, then
-  publish through the agreed GitHub path to run remote CI. After that, resume the
-  ordered roadmap without mixing further Prompt 4+ work into this closeout.
+- Publish through the agreed GitHub path to run remote CI, confirm credential
+  rotation externally, then resume the ordered roadmap with Prompt 4 or the next
+  explicitly selected prompt.
