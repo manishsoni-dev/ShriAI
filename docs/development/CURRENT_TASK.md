@@ -17,28 +17,38 @@ documentation gaps, establish a stable reviewable baseline, and complete Prompt
 3. Prompt 2 canonical diff truth: `src/app/layout.tsx` and
    `src/app/globals.css` are included in the committed Prompt 1/2 baseline and
    had no uncommitted diff at the start of this closeout.
-4. `.node-version` selects Node `20.19.0`; `package.json` requires Node
+4. Codex-vs-Antigravity authorship cannot be independently proven from Git
+   metadata because the local commits share the same Git author identity. The
+   authoritative attribution for Prompt 2 is therefore the committed baseline
+   boundary: `bd0d7c1` contains runtime pins, CI, docs, and deterministic font
+   changes.
+5. Duplicate/conflicting unrelated edits were found outside the closeout scope
+   during verification, including UI/audio/persona WIP and a duplicate
+   `composerValue` declaration in `src/app/chat/chat-shell.tsx`. Those changes
+   were preserved in named Git stashes and excluded from the Prompt 1-3
+   closeout baseline.
+6. `.node-version` selects Node `20.19.0`; `package.json` requires Node
    `>=20.19.0` and npm `>=10.0.0`; `.npmrc` enables `engine-strict=true`; CI
    reads `.node-version` and runs `npm ci`.
-5. GitHub Actions workflow exists at `.github/workflows/ci.yml` and mirrors the
+7. GitHub Actions workflow exists at `.github/workflows/ci.yml` and mirrors the
    clean-clone command order using a disposable `pgvector/pgvector:pg16`
    service. `gh run list --repo manishsoni-dev/ShriAI --limit 10` returned no
    workflow runs, so remote CI has not been verified.
-6. `.env`, `.env.local`, `node_modules`, `.next`, caches, uploads, and eval
+8. `.env`, `.env.local`, `node_modules`, `.next`, caches, uploads, and eval
    outputs are ignored. `git log --all -- .env .env.local .env.production
 .env.development` returned no tracked environment file history.
-7. Path-only secret marker search found documented placeholders in
+9. Path-only secret marker search found documented placeholders in
    `README.md`/`.env.example`; no secret values were printed or copied.
-8. Credential rotation is required because the initial external archive included
-   populated local env files. Completion is not verifiable from Git; the
-   requirement is recorded in `docs/development/RISK_REGISTER.md`.
-9. Prompt 3 policy is private conversation ownership:
-   `Conversation.userId === authenticated user.id`. Workspace membership alone
-   does not grant access to another user's conversation.
-10. Conversation helper access lives in `src/lib/conversations.ts`; chat page,
+10. Credential rotation is required because the initial external archive included
+    populated local env files. Completion is not verifiable from Git; the
+    requirement is recorded in `docs/development/RISK_REGISTER.md`.
+11. Prompt 3 policy is private conversation ownership:
+    `Conversation.userId === authenticated user.id`. Workspace membership alone
+    does not grant access to another user's conversation.
+12. Conversation helper access lives in `src/lib/conversations.ts`; chat page,
     chat server action, and chat stream route derive identity from `auth()` and
     database user lookup rather than client-supplied identity.
-11. Local Next.js 16.2.6 docs reviewed before route/security assertions: route
+13. Local Next.js 16.2.6 docs reviewed before route/security assertions: route
     handlers, authentication, proxy, and data security. Proxy is an optimistic
     route gate only; server route/data helpers must enforce authorization.
 
