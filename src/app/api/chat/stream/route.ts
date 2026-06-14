@@ -1,9 +1,10 @@
 import {
-  generateGroundedAnswer,
+  streamGroundedAnswer,
   validateAnswerCitations,
+  type GroundedAnswer,
 } from "@/lib/ai/answer-generator";
+import { type AIMessage } from "@/lib/ai/types";
 
-// ... existing imports ...
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
@@ -116,17 +117,44 @@ async function getWorkspaceDocumentContext(input: {
 
 async function persistCitations(
   messageId: string,
+  answerCitations: GroundedAnswer["citations"],
   ragResult: ScriptureRetrievalResult,
 ) {
-  if (ragResult.chunks.length === 0) return;
+  if (answerCitations.length === 0 || ragResult.chunks.length === 0) return;
 
-  try {
-    await db.answerCitation.createMany({
-      data: ragResult.chunks.map((chunk) => ({
+  const byRef = new Map(
+    ragResult.chunks.map((chunk) => [
+      `${chunk.sourceTitle}::${chunk.canonicalRef}`,
+      chunk,
+    ]),
+  );
+  const byId = new Map(ragResult.chunks.map((chunk) => [chunk.id, chunk]));
+
+  const dataToInsert: { messageId: string; chunkId: string; score: number }[] =
+    [];
+
+  for (const citation of answerCitations) {
+    let chunk = null;
+    if (citation.chunkId) {
+      chunk = byId.get(citation.chunkId);
+    } else {
+      chunk = byRef.get(`${citation.source}::${citation.canonicalRef}`);
+    }
+
+    if (chunk) {
+      dataToInsert.push({
         messageId,
         chunkId: chunk.id,
         score: chunk.score,
-      })),
+      });
+    }
+  }
+
+  if (dataToInsert.length === 0) return;
+
+  try {
+    await db.answerCitation.createMany({
+      data: dataToInsert,
       skipDuplicates: true,
     });
   } catch {
@@ -195,6 +223,28 @@ export async function POST(request: Request) {
       userId: user.id,
       conversationId,
     });
+
+    const previousMessages = await listMessages({
+      userId: user.id,
+      conversationId: conversation.id,
+      limit: 20,
+    });
+
+    // Duplicate send prevention
+    if (previousMessages.length > 0) {
+      const lastMessage = previousMessages[previousMessages.length - 1];
+      if (
+        lastMessage.role === "user" &&
+        lastMessage.content === content &&
+        Date.now() - lastMessage.createdAt.getTime() < 5000
+      ) {
+        return NextResponse.json(
+          { error: "Duplicate request" },
+          { status: 409 },
+        );
+      }
+    }
+
     const persona = getPersona(
       isPersonaId(requestedPersonaId)
         ? requestedPersonaId
@@ -227,12 +277,6 @@ export async function POST(request: Request) {
       });
 
       return message;
-    });
-
-    await listMessages({
-      userId: user.id,
-      conversationId: conversation.id,
-      limit: 20,
     });
 
     if (detectCrisisIntent(content)) {
@@ -331,6 +375,7 @@ export async function POST(request: Request) {
       : "";
 
     const encoder = new TextEncoder();
+    const abortSignal = request.signal;
 
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
@@ -344,7 +389,7 @@ export async function POST(request: Request) {
         );
 
         try {
-          const answer = await generateGroundedAnswer({
+          const streamGen = streamGroundedAnswer({
             query: content,
             persona,
             scriptureContext,
@@ -352,42 +397,72 @@ export async function POST(request: Request) {
             insufficientContext: ragResult?.insufficientContext ?? false,
             insufficientApprovedContext:
               ragResult?.insufficientApprovedContext ?? false,
+            history: previousMessages.map((msg) => ({
+              role: msg.role as AIMessage["role"],
+              content: msg.content,
+            })),
+            signal: abortSignal,
           });
+
+          let finalAnswer: GroundedAnswer | null = null;
+
+          for await (const event of streamGen) {
+            if (abortSignal.aborted) {
+              break;
+            }
+
+            if (event.type === "delta") {
+              controller.enqueue(
+                encoder.encode(
+                  streamEvent({
+                    type: "assistant-delta",
+                    text: event.text,
+                  }),
+                ),
+              );
+            } else if (event.type === "done") {
+              finalAnswer = event.answer;
+            }
+          }
+
+          if (abortSignal.aborted) {
+            controller.close();
+            return;
+          }
+
+          if (!finalAnswer) {
+            throw new Error("Stream closed without final answer metadata.");
+          }
 
           if (
             ragResult &&
-            answer.citations.length > 0 &&
-            !validateAnswerCitations(answer.citations, ragResult.chunks)
+            finalAnswer.citations.length > 0 &&
+            !validateAnswerCitations(finalAnswer.citations, ragResult.chunks)
           ) {
             throw new Error("Generated answer contained invalid citations.");
           }
 
-          // Enqueue the whole message immediately
-          controller.enqueue(
-            encoder.encode(
-              streamEvent({
-                type: "assistant-delta",
-                text: answer.displayAnswer,
-              }),
-            ),
-          );
           const assistantMessage = await createMessage({
             userId: user.id,
             conversationId: conversation.id,
             role: "assistant",
-            content: answer.displayAnswer,
+            content: finalAnswer.displayAnswer,
             metadata: {
-              provider: "openai",
-              model: "gpt-4o-mini",
-              grounding: answer.grounding,
-              spokenAnswer: answer.spokenAnswer,
+              provider: "ai-gateway",
+              model: "gpt-4o-mini", // Passed dynamically if available, otherwise default
+              grounding: finalAnswer.grounding,
+              spokenAnswer: finalAnswer.spokenAnswer,
               traceId,
             },
           });
 
-          // Persist citations (fire and forget)
+          // Persist only citations actually used
           if (ragResult) {
-            void persistCitations(assistantMessage.id, ragResult);
+            void persistCitations(
+              assistantMessage.id,
+              finalAnswer.citations,
+              ragResult,
+            );
           }
 
           void logObservabilityEvent({
@@ -412,8 +487,8 @@ export async function POST(request: Request) {
                 keywordRank: chunk.keywordRank,
                 rerankerScore: chunk.score,
               })),
-              finalCitations: ragResult?.citations ?? [],
-              grounding: answer.grounding,
+              finalCitations: finalAnswer.citations,
+              grounding: finalAnswer.grounding,
             },
           });
 
@@ -422,8 +497,8 @@ export async function POST(request: Request) {
               streamEvent({
                 type: "assistant-message",
                 message: serializeMessage(assistantMessage),
-                spokenAnswer: answer.spokenAnswer,
-                citations: ragResult?.citations ?? [],
+                spokenAnswer: finalAnswer.spokenAnswer,
+                citations: finalAnswer.citations,
                 traceId,
                 ...(isDevMode && ragResult?.debug
                   ? { ragDebug: ragResult.debug }
@@ -433,6 +508,11 @@ export async function POST(request: Request) {
           );
           controller.close();
         } catch (error) {
+          if (abortSignal.aborted) {
+            controller.close();
+            return;
+          }
+
           const message =
             error instanceof AIError
               ? `${error.code}: ${error.message}`
