@@ -1,8 +1,9 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { ChatShell } from "@/app/chat/chat-shell";
 import {
+  ConversationAccessError,
   getConversation,
   listConversations,
   listMessages,
@@ -48,19 +49,28 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   const selectedConversationId =
     conversationId ?? conversations.at(0)?.id ?? null;
 
-  const selectedConversation = selectedConversationId
-    ? await getConversation({
+  let selectedConversation: Awaited<ReturnType<typeof getConversation>> | null =
+    null;
+  let messages: Awaited<ReturnType<typeof listMessages>> = [];
+
+  if (selectedConversationId) {
+    try {
+      selectedConversation = await getConversation({
         userId: user.id,
         conversationId: selectedConversationId,
-      })
-    : null;
-
-  const messages = selectedConversation
-    ? await listMessages({
+      });
+      messages = await listMessages({
         userId: user.id,
         conversationId: selectedConversation.id,
-      })
-    : [];
+      });
+    } catch (error) {
+      if (error instanceof ConversationAccessError) {
+        notFound();
+      }
+
+      throw error;
+    }
+  }
 
   return (
     <ChatShell

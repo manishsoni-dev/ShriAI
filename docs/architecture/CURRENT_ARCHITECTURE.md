@@ -8,7 +8,7 @@
 - **ORM**: Prisma
 - **Authentication**: NextAuth.js (Auth.js) v5
 - **AI Gateway**: OpenAI API (for Chat and Embeddings)
-- **Voice**: ElevenLabs, Deepgram (or configurable fallback)
+- **Voice**: OpenAI, Deepgram, or Google Speech-to-Text for transcription; ElevenLabs for persona TTS with typed/browser fallback paths.
 
 ## High-Level Flow
 

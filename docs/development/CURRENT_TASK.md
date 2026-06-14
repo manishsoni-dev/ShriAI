@@ -1,138 +1,211 @@
-# Current Task: Prompt 1/2 Reconciliation, Baseline Closeout, and Prompt 3 Verification
+# Current Task: Prompt 1-3 Closeout Reconciliation
 
 ## Objective
 
-Formally reconcile multi-agent development history, establish a clean repository baseline by committing stacked uncommitted changes into logical chunks, verify Prompt 3 conversation authorization controls, and ensure all validation checks pass.
+Reconcile Prompt 1 and Prompt 2 against actual Git state, close repository
+documentation gaps, establish a stable reviewable baseline, and complete Prompt
+3 conversation ownership enforcement before any further roadmap implementation.
 
 ## Verified Current Flow
 
-1. **Authentication & Authorization**: Handled via NextAuth.js (`auth()`) in server routes, layout components, and server actions.
-2. **Conversation Helpers**: `src/lib/conversations.ts` implements strict ownership checks:
-   - `getConversation`, `deleteConversation`, `createMessage`, and `listMessages` verify the caller matches `conversation.userId`.
-   - `listConversations` retrieves only conversations matching the authenticated user's ID.
-   - Access denied or missing conversations throw `ConversationAccessError`, which maps to a non-enumerating `404 Not Found` response in the API routes.
-3. **API Streaming Route**: `/api/chat/stream/route.ts` authenticates the caller, validates input, verifies rate limits, and uses the database user ID to ensure safe, owned access to the conversation.
-4. **Reproducible Builds**: Locked via Node `20.19.0` (in `.node-version` and engines), npm `>=10.0.0`, and `.npmrc` enforcing `engine-strict=true`. Fonts are deterministic and offline-ready via system-font stack mappings in `globals.css` and `layout.tsx`.
+1. `main` is ahead of `origin/main` by seven local commits before this closeout
+   commit. Local commits already include Prompt 1/2 baseline work, Prompt 3
+   helper tests, Prompt 3 route tests, and Prompt 4 streaming work.
+2. Prompt 1/2 baseline exists in commit `bd0d7c1`:
+   `.gitignore`, `.node-version`, `.npmrc`, architecture/development docs, CI,
+   package runtime pins, and deterministic font changes were committed together.
+3. Prompt 2 canonical diff truth: `src/app/layout.tsx` and
+   `src/app/globals.css` are included in the committed Prompt 1/2 baseline and
+   had no uncommitted diff at the start of this closeout.
+4. `.node-version` selects Node `20.19.0`; `package.json` requires Node
+   `>=20.19.0` and npm `>=10.0.0`; `.npmrc` enables `engine-strict=true`; CI
+   reads `.node-version` and runs `npm ci`.
+5. GitHub Actions workflow exists at `.github/workflows/ci.yml` and mirrors the
+   clean-clone command order using a disposable `pgvector/pgvector:pg16`
+   service. `gh run list --repo manishsoni-dev/ShriAI --limit 10` returned no
+   workflow runs, so remote CI has not been verified.
+6. `.env`, `.env.local`, `node_modules`, `.next`, caches, uploads, and eval
+   outputs are ignored. `git log --all -- .env .env.local .env.production
+.env.development` returned no tracked environment file history.
+7. Path-only secret marker search found documented placeholders in
+   `README.md`/`.env.example`; no secret values were printed or copied.
+8. Credential rotation is required because the initial external archive included
+   populated local env files. Completion is not verifiable from Git; the
+   requirement is recorded in `docs/development/RISK_REGISTER.md`.
+9. Prompt 3 policy is private conversation ownership:
+   `Conversation.userId === authenticated user.id`. Workspace membership alone
+   does not grant access to another user's conversation.
+10. Conversation helper access lives in `src/lib/conversations.ts`; chat page,
+    chat server action, and chat stream route derive identity from `auth()` and
+    database user lookup rather than client-supplied identity.
+11. Local Next.js 16.2.6 docs reviewed before route/security assertions: route
+    handlers, authentication, proxy, and data security. Proxy is an optimistic
+    route gate only; server route/data helpers must enforce authorization.
 
 ## Scope
 
-- Step 0: Read-only reconciliation of Prompt 1 documentation, ignore rules, secrets safety, and Codex/Antigravity changes.
-- Step 1: Verification of project inventory, current architecture, risk register, decisions, and task documentation.
-- Step 2: Committing all stacked uncommitted changes (rules, route tests, and streaming WIP) into clean, reviewable git commits.
-- Step 3: Verifying Prompt 3 ownership checks, route-level authorization coverage, and running the verification matrix (test, format, lint, typecheck, build).
+- Correct stale repository documentation discovered during reconciliation.
+- Preserve existing local commits and unrelated user/agent work.
+- Add minimal Prompt 3 enforcement/coverage where actual inspection showed a
+  page-level ownership handling gap.
+- Commit only scoped Prompt 1-3 closeout changes.
+- Update Notion Prompt 1/2/3 status after local verification, without secrets.
 
 ## Out-Of-Scope Work
 
-- Changing existing database schemas or adding new tables/relations.
-- Upgrading unrelated dependencies.
-- Modifying ElevenLabs, Deepgram, or OpenAI API provider logic.
+- Prompt 4 streaming architecture changes, retrieval tuning, voice behavior,
+  product design changes, or UI/audio persona WIP.
+- Schema changes, migrations, dependency upgrades, broad refactors, branch
+  reset, force-push, or destructive cleanup.
+- Publishing, pushing, or opening a PR unless explicitly requested.
+- Claiming credential rotation completion without external confirmation.
 
 ## Decisions
 
-- **Private Conversation Ownership**: A conversation is strictly owned by the user who created it (`userId === authenticatedUser.id`). Workspace membership alone must never grant access.
-- **Non-enumerating Error Handling**: Return the same `404 Not Found` for inaccessible conversations as for non-existent ones to avoid enumeration vulnerabilities.
-- **Separate Commits**: Stacked uncommitted changes are split into separate commits:
-  1. Repository hygiene and operating rules (Prompt 1).
-  2. API route-level authorization tests (Prompt 3).
-  3. Streaming AI chat provider/tokens implementation (Prompt 4).
+- Repository state and commit history are source of truth over previous AI
+  summaries.
+- Existing local commits were not rewritten to split Prompt 1/2 more finely;
+  rewriting local history would be a higher-risk operation than recording the
+  canonical committed baseline.
+- Remote GitHub CI remains unverified until commits are pushed and a workflow
+  run is observed.
+- Conversation access remains owner-only; workspace peers are denied.
+- Inaccessible selected chat-page conversations now map to `notFound()` so
+  missing and inaccessible conversation IDs are non-enumerating.
+- Unrelated UI/audio/persona WIP was preserved in named Git stashes instead of
+  being reformatted or committed into this closeout.
 
 ## Acceptance Criteria
 
-- All documentation files (`PROJECT_INVENTORY.md`, `CURRENT_ARCHITECTURE.md`, `RISK_REGISTER.md`, `DECISIONS.md`, `CURRENT_TASK.md`) exist and are accurate.
-- Sensitive files (`.env`, `.env.local`, `node_modules`, `.next`) are correctly ignored and not tracked.
-- Credential rotation requirements are recorded in `RISK_REGISTER.md`.
-- Active worktree contains no dirty code edits.
-- All 88 tests pass in the test suite.
-- Linter, formatter check, and typechecker pass.
-- Production build (`next build`) runs and succeeds.
+- Prompt 1 docs and repo hygiene evidence are accurate.
+- Prompt 2 canonical diff is recorded accurately.
+- `.env` values and local secrets are not copied into docs, logs, Notion, or CI.
+- Prompt 3 server paths enforce authenticated owner-only conversation access.
+- Workspace peers, cross-user callers, and cross-workspace callers cannot read,
+  write, stream, or select another user's conversation.
+- Required local verification commands pass.
+- Scoped changes are committed into a reviewable closeout commit.
 
 ## Files Expected To Change
 
+- `README.md`
+- `docs/architecture/CURRENT_ARCHITECTURE.md`
 - `docs/development/CURRENT_TASK.md`
+- `docs/development/DECISIONS.md`
+- `src/app/chat/page.tsx`
+- `src/app/chat/page.test.tsx`
 
 ## Files That Must Remain Unchanged
 
-- All source files under `src/` (since they are already committed and fully passing).
-- Database migrations and configuration.
-- package.json engine and script configs.
+- Prisma schema and migrations.
+- Auth provider behavior.
+- RAG, voice, review, and provider implementations.
+- Existing Prompt 4 stream implementation files except through separate future
+  Prompt 4 work.
+- `.env`, `.env.local`, `.next`, `node_modules`, caches, uploads, and generated
+  local artifacts.
 
 ## Tests Required
 
-- Owner can list and read their conversations.
-- Owner can send messages and stream responses.
-- Stranger or workspace peer cannot access, list, stream, or delete another user's conversations.
-- Unauthenticated requests are rejected with 401.
-- Missing and unauthorized conversations both return a non-enumerating 404.
+- Conversation helper owner success, invalid callers, workspace peer denial,
+  cross-user denial, cross-workspace denial, message read/write ownership, and
+  deletion ownership.
+- Chat stream route: unauthenticated `401`, invalid input `400`, owner success,
+  rate limit behavior, client identity ignored, inaccessible conversation `404`,
+  and no writes after authorization failure.
+- Chat page selected conversation: owner lookup succeeds and inaccessible or
+  missing conversation maps to `notFound()`.
 
 ## Verification Commands
 
 ```bash
-git status --short
+git status --short --branch
+git diff --stat
+git diff
 git log --oneline -10
 npm run format:check
 npm run lint
 npm run typecheck
 npm run test
 npm run build
+npm run prisma:generate
+npx prisma validate
+npx prisma migrate status
+npm run db:ready
 git diff --check
+git status --short
 ```
 
----
-
-## Implementation Log (2026-06-14)
+## Implementation Log
 
 ### What Was Implemented
 
-1. **Step 0 — Read-Only Reconciliation**:
-   - Checked `git status --short`, `git diff --stat`, and `git log --oneline -10`.
-   - Verified `.env` and secrets were never committed (only `.env.example` exists in git history).
-   - Confirmed credential rotation is recorded in `RISK_REGISTER.md`.
-   - Verified that `.node-version`, `.npmrc`, package.json engines, and GitHub workflows CI config agree on the Node.js version.
-   - Identified that recent commits have not yet been pushed to GitHub, so remote CI has not run yet.
-2. **Step 1 — Closed Prompt 1 properly**:
-   - Verified `docs/architecture/PROJECT_INVENTORY.md` list of domains.
-   - Verified `docs/architecture/CURRENT_ARCHITECTURE.md` stack and high-level flows.
-   - Verified `docs/development/RISK_REGISTER.md` for credential security and mitigation details.
-   - Verified `docs/development/DECISIONS.md` version pins and vector DB choices.
-   - Added durable operating rules to `AGENTS.md`.
-3. **Step 2 — Established a stable baseline**:
-   - Staged and committed uncommitted changes in logical, reviewable commits:
-     - `6143ccf`: Repository hygiene operating rules and task template.
-     - `0d332a0`: API route-level conversation ownership and authorization checks (Prompt 3 tests).
-     - `8321190`: Stream provider tokens and prevent duplicate sends (Prompt 4 implementation).
-   - Ran clean-clone validation matrix.
-4. **Step 3 — Verified Prompt 3 & 4 Health**:
-   - Validated that `conversations.ts` and `/api/chat/stream` enforce conversation ownership.
-   - Confirmed 20 unit tests in `src/lib/conversations.test.ts` and 9 integration tests in `src/app/api/chat/stream/route.test.ts` cover all authorization, workspace boundaries, and rate limiting cases.
+- Reconciled Prompt 1 and Prompt 2 from actual Git state instead of prior
+  summaries.
+- Recorded the canonical Prompt 2 diff truth: `src/app/layout.tsx` and
+  `src/app/globals.css` are included in `bd0d7c1`.
+- Verified ignore rules and path-only secret hygiene without printing secret
+  values.
+- Corrected the Node pinning decision record to match `.node-version`,
+  `.npmrc`, `package.json`, and CI.
+- Corrected architecture and README text to match current voice provider options
+  and private conversation ownership policy.
+- Added a server-side chat page guard that maps inaccessible selected
+  conversations to `notFound()`.
+- Added chat page tests for selected-conversation ownership behavior.
+- Preserved unrelated UI/audio/persona WIP in Git stashes:
+  `preserve unrelated UI audio persona WIP before Prompt 1-3 closeout` and
+  `preserve remaining UI audio persona WIP before Prompt 1-3 closeout`.
 
 ### Files Changed
 
+- `README.md`
+- `docs/architecture/CURRENT_ARCHITECTURE.md`
 - `docs/development/CURRENT_TASK.md`
+- `docs/development/DECISIONS.md`
+- `src/app/chat/page.tsx`
+- `src/app/chat/page.test.tsx`
 
 ### Decisions Made
 
-- Split the uncommitted code state into distinct commits for repository hygiene (rules/templates), Prompt 3 tests, and Prompt 4 streaming code, keeping the worktree clean.
-- Left Notion task status updates to the user (since Notion is external and not directly accessible in this environment).
+- Keep the Prompt 3 private owner policy unchanged.
+- Use non-enumerating `notFound()` for inaccessible chat page selections.
+- Do not push local commits during this task; remote CI verification remains a
+  follow-up unless publishing is explicitly requested.
+- Do not claim credential rotation completion from repository evidence.
 
 ### Tests Run
 
-- `npm run test`: All 88 tests in 13 files passed.
-- `npm run test -- conversations`: Passed.
-- `npm run test -- chat`: Passed.
+- `npm run test`: 90 tests passed across 14 test files.
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
 
 ### Checks Passed
 
-- `npm run format:check`: Passed.
-- `npm run lint`: Passed.
-- `npm run typecheck`: Passed.
-- `npm run build`: Passed (successful Next.js production build).
-- `git diff --check`: Passed.
-- `git status --short`: Passed (only `CURRENT_TASK.md` is modified).
+- `npm run format:check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `npm run prisma:generate`
+- `npx prisma validate`
+- `npx prisma migrate status`
+- `npm run db:ready`
+- `git diff --check`
+
+### Checks Failed
+
+- None for the isolated Prompt 1-3 closeout work.
 
 ### Remaining Blockers
 
-- None.
+- Remote GitHub CI is unverified because local commits have not been pushed and
+  no GitHub Actions runs were listed.
+- Credential rotation completion is not verifiable from repository state.
 
 ### Recommended Next Task
 
-- Prompt 5 — Separation of text and voice retrieval policies.
+- Update Notion Prompt 1/2/3 status from the verified local evidence, then
+  publish through the agreed GitHub path to run remote CI. After that, resume the
+  ordered roadmap without mixing further Prompt 4+ work into this closeout.

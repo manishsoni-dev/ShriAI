@@ -17,5 +17,5 @@
 
 ## D004: Version Pinning
 
-- **Decision**: Pin Node.js to `>=20.0.0` and npm to `>=10.0.0`.
+- **Decision**: Pin Node.js to `20.19.0` for local and CI runtime selection via `.node-version`; require Node.js `>=20.19.0` and npm `>=10.0.0` in `package.json`.
 - **Reasoning**: Ensures consistent dependency resolution, compatibility with Prisma, Vite, Next.js, and `pdf-parse`. Enforced via `.npmrc` and `.node-version`.

@@ -438,7 +438,12 @@ The current local credentials flow creates a `User` record on first sign-in and 
 
 Persistent conversation and message access lives in `src/lib/conversations.ts`.
 
-The exported helpers create, list, read, and delete conversations, plus create and list messages. Every helper accepts a `userId` and checks workspace membership before reading or mutating conversation data, so users cannot access another workspace's conversations through the server-side data layer.
+The exported helpers create, list, read, and delete conversations, plus create
+and list messages. Conversations are private to their creator. Workspace
+membership is required to create and list conversations in a workspace, but
+detail reads, message reads, message creation, and deletion enforce
+`Conversation.userId === authenticated user.id`; workspace peers cannot access
+each other's conversations.
 
 ## AI Gateway
 
