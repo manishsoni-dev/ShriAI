@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { createConversation } from "@/lib/conversations";
 import { db } from "@/lib/db";
+import { getPersona } from "@/lib/personas";
 import { ensureDefaultWorkspace } from "@/lib/workspaces";
 
 async function getCurrentUser() {
@@ -28,15 +29,17 @@ async function getCurrentUser() {
   return user;
 }
 
-export async function createConversationAction() {
+export async function createConversationAction(personaId?: string) {
   const user = await getCurrentUser();
   const workspace = await ensureDefaultWorkspace(user);
+  const persona = getPersona(personaId);
   const conversation = await createConversation({
     userId: user.id,
     workspaceId: workspace.id,
-    title: "New conversation",
+    title: `${persona.displayName} guidance`,
     metadata: {
       source: "chat",
+      personaId: persona.id,
     },
   });
 

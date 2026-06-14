@@ -7,41 +7,41 @@ datasource db {
 }
 
 model User {
-  id              String            @id @default(cuid())
-  email           String            @unique
-  name            String?
-  imageUrl        String?
-  passwordHash    String
-  workspaceMember WorkspaceMember[]
-  conversations   Conversation[]
-  usageEvents     UsageEvent[]
-  uploadedDocuments Document[]      @relation("DocumentUploadedBy")
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                String            @id @default(cuid())
+  email             String            @unique
+  name              String?
+  imageUrl          String?
+  passwordHash      String
+  workspaceMember   WorkspaceMember[]
+  conversations     Conversation[]
+  usageEvents       UsageEvent[]
+  uploadedDocuments Document[]        @relation("DocumentUploadedBy")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 }
 
 model Workspace {
-  id            String            @id @default(cuid())
-  name          String
-  slug          String            @unique
-  members       WorkspaceMember[]
-  conversations Conversation[]
-  usageEvents   UsageEvent[]
-  documents     Document[]
+  id             String            @id @default(cuid())
+  name           String
+  slug           String            @unique
+  members        WorkspaceMember[]
+  conversations  Conversation[]
+  usageEvents    UsageEvent[]
+  documents      Document[]
   documentChunks DocumentChunk[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 }
 
 model WorkspaceMember {
-  id          String          @id @default(cuid())
-  role        WorkspaceRole   @default(MEMBER)
+  id          String        @id @default(cuid())
+  role        WorkspaceRole @default(MEMBER)
   userId      String
   workspaceId String
-  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 
   @@unique([userId, workspaceId])
   @@index([workspaceId])
@@ -54,17 +54,17 @@ enum WorkspaceRole {
 }
 
 model Conversation {
-  id          String    @id @default(cuid())
+  id          String       @id @default(cuid())
   title       String?
   metadata    Json?
   workspaceId String
   userId      String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages    Message[]
   usageEvents UsageEvent[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([workspaceId])
   @@index([userId])
@@ -73,14 +73,14 @@ model Conversation {
 }
 
 model Message {
-  id             String          @id @default(cuid())
+  id             String       @id @default(cuid())
   role           MessageRole
   content        String
   metadata       Json?
   conversationId String
-  conversation   Conversation    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@index([conversationId])
   @@index([createdAt])
@@ -124,20 +124,111 @@ enum UsageEventStatus {
   error
 }
 
+/// Flexible trace events for voice, retrieval, chat, and TTS diagnostics.
+model ObservabilityEvent {
+  id             String   @id @default(cuid())
+  traceId        String
+  eventType      String
+  status         String
+  userId         String?
+  conversationId String?
+  messageId      String?
+  personaId      String?
+  model          String?
+  latencyMs      Int?
+  payload        Json?
+  createdAt      DateTime @default(now())
+
+  @@index([traceId])
+  @@index([eventType])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+enum VoiceQaRunStatus {
+  pending
+  passed
+  failed
+  partial
+}
+
+enum VoiceQaStepStatus {
+  pending
+  passed
+  failed
+  skipped
+}
+
+model VoiceQaRun {
+  id          String           @id @default(cuid())
+  label       String
+  device      String?
+  browser     String?
+  personaId   String?
+  status      VoiceQaRunStatus @default(pending)
+  notes       String?
+  startedAt   DateTime         @default(now())
+  completedAt DateTime?
+  steps       VoiceQaStep[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([status])
+  @@index([personaId])
+  @@index([startedAt])
+}
+
+model VoiceQaStep {
+  id                 String            @id @default(cuid())
+  runId              String
+  stepType           String
+  status             VoiceQaStepStatus @default(pending)
+  transcript         String?
+  expectedTranscript String?
+  wer                Float?
+  latencyMs          Int?
+  firstAudibleMs     Int?
+  errorCode          String?
+  notes              String?
+  payload            Json?
+  run                VoiceQaRun        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([runId])
+  @@index([stepType])
+  @@index([status])
+}
+
+model WaitlistLead {
+  id        String   @id @default(cuid())
+  email     String
+  name      String?
+  interest  String?
+  message   String?
+  source    String   @default("waitlist")
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
 model Document {
-  id           String         @id @default(cuid())
+  id           String          @id @default(cuid())
   filename     String
   contentType  String
   size         Int
-  storageKey   String         @unique
-  status       DocumentStatus @default(uploaded)
+  storageKey   String          @unique
+  status       DocumentStatus  @default(uploaded)
   uploadedById String
   workspaceId  String
-  uploadedBy   User           @relation("DocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
-  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedBy   User            @relation("DocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   chunks       DocumentChunk[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
 
   @@index([workspaceId])
   @@index([uploadedById])
@@ -153,20 +244,168 @@ enum DocumentStatus {
 }
 
 model DocumentChunk {
-  id          String                  @id @default(cuid())
+  id          String                       @id @default(cuid())
   documentId  String
   workspaceId String
   chunkIndex  Int
   content     String
   metadata    Json?
   embedding   Unsupported("vector(1536)")?
-  document    Document                @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  document    Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workspace   Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                     @default(now())
+  updatedAt   DateTime                     @updatedAt
 
   @@unique([documentId, chunkIndex])
   @@index([documentId])
   @@index([workspaceId])
   @@index([workspaceId, documentId])
+}
+
+// ── Scripture RAG Models ────────────────────────────────────────────────────
+
+/// One canonical text (e.g. "Bhagavad Gita"). Priority 1–10 (10 = most authoritative).
+model ScriptureSource {
+  id              String           @id @default(cuid())
+  /// e.g. "Bhagavad Gita", "Valmiki Ramayana"
+  canonicalTitle  String           @unique
+  /// e.g. "Vaishnava", "Shaiva", "Universal"
+  tradition       String
+  /// Primary language of the original text
+  language        String           @default("sanskrit")
+  /// "public_domain", "licensed", "fair_use"
+  copyrightStatus String           @default("public_domain")
+  /// 1–10 — used to boost retrieval score (10 = highest priority)
+  priority        Int              @default(5)
+  /// Source-level eligibility switch for production retrieval.
+  active          Boolean          @default(true)
+  chunks          ScriptureChunk[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([tradition])
+  @@index([priority])
+  @@index([active])
+}
+
+/// One verse, doha, passage, or thematic chunk from a scripture source.
+model ScriptureChunk {
+  id              String                       @id @default(cuid())
+  sourceId        String
+  /// Canonical reference string, e.g. "2.47", "Sundara Kanda 1.1"
+  canonicalRef    String
+  /// Primary language of the originalText field
+  language        String                       @default("sanskrit")
+  /// Devanagari / original script
+  originalText    String?
+  /// IAST / ISO 15919 transliteration
+  transliteration String?
+  /// English translation
+  translation     String
+  /// Scholarly or devotional commentary
+  commentary      String?
+  /// Practical application — used in answer planning
+  practicalNote   String?
+  /// Persona IDs this chunk is primarily associated with (e.g. ["krishna"])
+  personaTags     String[]
+  /// Thematic tags (e.g. ["karma", "duty", "detachment"])
+  themeTags       String[]
+  /// Emotional/situational tags (e.g. ["confusion", "grief", "fear_of_failure"])
+  emotionTags     String[]
+  /// Use-case labels (e.g. ["career confusion", "dealing with loss"])
+  answerUseCases  String[]
+  /// OpenAI embedding of translation + commentary combined
+  embedding       Unsupported("vector(1536)")?
+  /// PostgreSQL full-text search vector (auto-maintained by DB trigger)
+  searchVector    Unsupported("tsvector")?
+  source          ScriptureSource              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  citations       AnswerCitation[]
+  reviews         ScriptureChunkReview[]
+  reviewAudits    ScriptureChunkReviewAudit[]
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@unique([sourceId, canonicalRef])
+  @@index([sourceId])
+  @@index([personaTags])
+  @@index([themeTags])
+}
+
+enum ScriptureReviewStatus {
+  pending
+  in_review
+  approved
+  rejected
+  needs_changes
+}
+
+/// Human theological/source review for a scripture chunk before broad voice use.
+model ScriptureChunkReview {
+  id                  String                @id @default(cuid())
+  chunkId             String                @unique
+  reviewStatus        ScriptureReviewStatus @default(pending)
+  reviewedBy          String?
+  reviewedAt          DateTime?
+  accuracyScore       Int?
+  interpretationNotes String?
+  rejectionReason     String?
+  approvedForVoice    Boolean               @default(false)
+  chunk               ScriptureChunk        @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  audits              ScriptureChunkReviewAudit[]
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  @@index([reviewStatus])
+  @@index([approvedForVoice])
+  @@index([reviewedAt])
+}
+
+/// Immutable audit trail for scripture chunk review decisions.
+model ScriptureChunkReviewAudit {
+  id                         String                 @id @default(cuid())
+  reviewId                   String
+  scriptureChunkId           String
+  previousStatus             ScriptureReviewStatus?
+  nextStatus                 ScriptureReviewStatus
+  previousApprovedForVoice   Boolean?
+  nextApprovedForVoice       Boolean
+  reviewerUserId             String
+  notes                      String?
+  review                     ScriptureChunkReview   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  scriptureChunk             ScriptureChunk         @relation(fields: [scriptureChunkId], references: [id], onDelete: Cascade)
+  createdAt                  DateTime               @default(now())
+
+  @@index([reviewId])
+  @@index([scriptureChunkId])
+  @@index([reviewerUserId])
+  @@index([createdAt])
+}
+
+/// Debug log: every scripture retrieval attempt. Used for improving retrieval quality.
+model RetrievalLog {
+  id                String   @id @default(cuid())
+  query             String
+  personaId         String
+  retrievedChunkIds String[]
+  selectedChunkIds  String[]
+  latencyMs         Int
+  sourceFilter      String[]
+  resultCount       Int      @default(0)
+  createdAt         DateTime @default(now())
+
+  @@index([personaId])
+  @@index([createdAt])
+}
+
+/// Links a Message to the ScriptureChunks cited in the response.
+model AnswerCitation {
+  id        String         @id @default(cuid())
+  messageId String
+  chunkId   String
+  score     Float?
+  chunk     ScriptureChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@index([messageId])
+  @@index([chunkId])
 }

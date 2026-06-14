@@ -8,11 +8,17 @@ import {
   listMessages,
 } from "@/lib/conversations";
 import { db } from "@/lib/db";
+import {
+  getPersona,
+  getPersonaFromMetadata,
+  isPersonaId,
+} from "@/lib/personas";
 import { ensureDefaultWorkspace } from "@/lib/workspaces";
 
 type ChatPageProps = {
   searchParams: Promise<{
     conversationId?: string;
+    persona?: string;
   }>;
 };
 
@@ -38,7 +44,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     userId: user.id,
     workspaceId: workspace.id,
   });
-  const { conversationId } = await searchParams;
+  const { conversationId, persona } = await searchParams;
   const selectedConversationId =
     conversationId ?? conversations.at(0)?.id ?? null;
 
@@ -64,6 +70,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
         createdAt: conversation.createdAt.toISOString(),
         updatedAt: conversation.updatedAt.toISOString(),
         preview: conversation.messages.at(0)?.content ?? null,
+        personaId: getPersonaFromMetadata(conversation.metadata).id,
       }))}
       currentUser={{
         email: user.email,
@@ -80,14 +87,25 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
           ? {
               id: selectedConversation.id,
               title: selectedConversation.title ?? "Untitled conversation",
+              personaId: getPersonaFromMetadata(selectedConversation.metadata)
+                .id,
             }
           : null
       }
-      key={selectedConversation?.id ?? "empty-chat"}
+      key={selectedConversation?.id ?? `empty-chat-${persona ?? "default"}`}
       workspace={{
         name: workspace.name,
         slug: workspace.slug,
       }}
+      initialPersonaId={
+        getPersona(
+          selectedConversation
+            ? getPersonaFromMetadata(selectedConversation.metadata).id
+            : isPersonaId(persona)
+              ? persona
+              : undefined,
+        ).id
+      }
     />
   );
 }

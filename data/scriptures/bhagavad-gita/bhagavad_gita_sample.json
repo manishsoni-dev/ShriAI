@@ -1,0 +1,64 @@
+[
+  {
+    "id": "bhagavad_gita_2_47",
+    "source": "Bhagavad Gita",
+    "canonicalRef": "2.47",
+    "chapter": 2,
+    "verse": 47,
+    "language": "sanskrit",
+    "originalText": "कर्मण्येवाधिकारस्ते मा फलेषु कदाचन।\nमा कर्मफलहेतुर्भूर्मा ते सङ्गोऽस्त्वकर्मणि।।",
+    "transliteration": "karmaṇyevādhikāraste mā phaleṣu kadācana,\nmā karmaphalaheturbhūrmā te saṅgo'stvakarmaṇi.",
+    "translation": "You have a right to perform your prescribed duty, but you are not entitled to the fruits of action. Never consider yourself the cause of the results of your activities, and never be attached to not doing your duty.",
+    "commentary": "This verse teaches the fundamental principle of Karma Yoga: action without attachment to the results. Focus on the effort rather than the outcome to avoid anxiety and ego-driven suffering.",
+    "personaTags": ["krishna"],
+    "themeTags": ["karma", "duty", "detachment", "action"],
+    "emotionTags": ["confusion", "fear_of_failure", "anxiety", "stress"],
+    "answerUseCases": [
+      "career confusion",
+      "fear of results",
+      "performance anxiety"
+    ],
+    "sourcePriority": 10,
+    "copyrightStatus": "public_domain"
+  },
+  {
+    "id": "bhagavad_gita_2_48",
+    "source": "Bhagavad Gita",
+    "canonicalRef": "2.48",
+    "chapter": 2,
+    "verse": 48,
+    "language": "sanskrit",
+    "originalText": "योगस्थः कुरु कर्माणि सङ्गं त्यक्त्वा धनञ्जय।\nसिद्ध्यसिद्ध्योः समो भूत्वा समत्वं योग उच्यते।।",
+    "transliteration": "yogasthaḥ kuru karmāṇi saṅgaṃ tyaktvā dhanañjaya,\nsiddhyasiddhyoḥ samo bhūtvā samatvaṃ yoga ucyate.",
+    "translation": "Perform your duty equipoised, O Arjuna, abandoning all attachment to success or failure. Such equanimity is called yoga.",
+    "commentary": "Equanimity in both success and failure is the true definition of Yoga. It means maintaining inner balance regardless of external circumstances.",
+    "personaTags": ["krishna"],
+    "themeTags": ["yoga", "equanimity", "balance", "detachment"],
+    "emotionTags": ["anxiety", "fear_of_failure", "stress"],
+    "answerUseCases": [
+      "coping with failure",
+      "dealing with stress",
+      "finding balance"
+    ],
+    "sourcePriority": 10,
+    "copyrightStatus": "public_domain"
+  },
+  {
+    "id": "bhagavad_gita_3_19",
+    "source": "Bhagavad Gita",
+    "canonicalRef": "3.19",
+    "chapter": 3,
+    "verse": 19,
+    "language": "sanskrit",
+    "originalText": "तस्मादसक्तः सततं कार्यं कर्म समाचर।\nअसक्तो ह्याचरन्कर्म परमाप्नोति पूरुषः।।",
+    "transliteration": "tasmādasaktaḥ satataṃ kāryaṃ karma samācara,\nasakto hyācarankarma paramāpnoti pūruṣaḥ.",
+    "translation": "Therefore, without being attached to the fruits of activities, one should act as a matter of duty, for by working without attachment one attains the Supreme.",
+    "commentary": "Continuous action without attachment leads to spiritual liberation and the highest goal.",
+    "personaTags": ["krishna"],
+    "themeTags": ["karma", "duty", "detachment", "liberation"],
+    "emotionTags": ["lack_of_purpose", "confusion"],
+    "answerUseCases": ["finding purpose", "understanding duty"],
+    "sourcePriority": 10,
+    "copyrightStatus": "public_domain"
+  }
+]

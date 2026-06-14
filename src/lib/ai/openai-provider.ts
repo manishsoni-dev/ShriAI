@@ -44,7 +44,11 @@ function toUsageMetadata(
 export class OpenAIProvider implements AIProvider {
   private readonly client: OpenAI;
 
-  constructor(client = new OpenAI({ apiKey: openAIConfig.apiKey })) {
+  constructor(
+    client = new OpenAI({
+      apiKey: openAIConfig.apiKey ?? "missing-openai-api-key",
+    }),
+  ) {
     this.client = client;
   }
 

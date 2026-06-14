@@ -13,7 +13,9 @@ Shri AI is a full-stack AI assistant foundation with authentication, workspace-a
 - OpenAI provider gateway with configurable models
 - Usage metadata capture for assistant responses
 - Document upload, text extraction, chunking, embeddings, and semantic search
-- Prisma/PostgreSQL persistence with local Docker setup
+- Voice-first chat with browser mic recording, speech transcription, persona TTS, and typed fallback
+- User-controlled looping OM ambience with persisted volume
+- Prisma/PostgreSQL persistence with migration-based setup
 
 ## Stack
 
@@ -24,12 +26,19 @@ Shri AI is a full-stack AI assistant foundation with authentication, workspace-a
 - Prisma ORM
 - PostgreSQL
 
+## Runtime Requirements
+
+- Node.js `20.19.0` or newer.
+- npm `10.0.0` or newer.
+- Use `npm ci` for reproducible dependency installation from `package-lock.json`.
+- `.npmrc` enables `engine-strict=true`, so unsupported Node/npm versions fail early.
+
 ## Local Setup
 
 1. Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 2. Create an environment file:
@@ -44,28 +53,17 @@ cp .env.example .env
 openssl rand -base64 32
 ```
 
-4. Start PostgreSQL with Docker:
+4. Configure Postgres using the [Database Setup](#database-setup) section.
 
-```bash
-docker compose up -d postgres
-```
-
-5. Update `DATABASE_URL` in `.env` if you are using a different PostgreSQL database.
-
-Example:
-
-```env
-DATABASE_URL="replace-with-postgres-database-url"
-```
-
-6. Generate the Prisma client and run the first migration:
+5. Generate the Prisma client and apply migrations:
 
 ```bash
 npm run prisma:generate
+npm run db:check
 npm run prisma:migrate
 ```
 
-7. Start the development server:
+6. Start the development server:
 
 ```bash
 npm run dev
@@ -73,15 +71,356 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Database Setup
+
+This project uses Prisma migrations as the source of truth. Do not use
+`prisma db push` as the normal setup path because committed migrations already
+exist. `npm run prisma:push` is available only as a temporary local development
+fallback for throwaway databases.
+
+The current migration history includes a `DocumentChunk.embedding vector(1536)`
+column, so the target Postgres database must support the `pgvector` extension.
+
+### Option A: Docker Compose
+
+The included Compose file uses a Postgres 16 image with pgvector installed:
+
+```bash
+docker compose up -d postgres
+```
+
+This creates a local `shri_ai` database that matches the default
+`DATABASE_URL` in `.env.example`.
+
+### Option B: local Postgres installed
+
+Install and start Postgres with your preferred local package manager. On macOS
+with Homebrew, one common path is:
+
+```bash
+brew install postgresql@16 pgvector
+brew services start postgresql@16
+createdb shri_ai
+```
+
+Enable pgvector if your package manager does not make it available
+automatically. The migration will run `CREATE EXTENSION IF NOT EXISTS vector`,
+but your database user must have permission and the extension must be installed
+on the server.
+
+Set `DATABASE_URL` in `.env.local` or `.env`:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/shri_ai?schema=public"
+```
+
+Adjust the username, password, host, and port for your local Postgres install.
+
+### Option C: remote Postgres URL
+
+Use any remote Postgres provider that supports Prisma and pgvector. Set
+`DATABASE_URL` to the provider connection string:
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public"
+```
+
+If your provider uses a pooler URL for runtime connections, use a direct
+migration-capable URL while running `npm run prisma:migrate`.
+
+### Apply migrations
+
+After `DATABASE_URL` is set, verify the database and apply the committed
+migrations:
+
+```bash
+npm run prisma:generate
+npm run db:check
+npm run prisma:migrate
+npm run db:ready
+npm run db:check
+```
+
+The waitlist/contact table is created by:
+
+```text
+prisma/migrations/20260611192000_add_waitlist_leads/migration.sql
+```
+
+To inspect the database in Prisma Studio:
+
+```bash
+npm run prisma:studio
+```
+
+Confirm these tables load in Studio for each database target: `WaitlistLead`,
+`Conversation`, `Message`, `DocumentChunk`, `ScriptureSource`,
+`ScriptureChunk`, `RetrievalLog`, `AnswerCitation`, and
+`ObservabilityEvent`.
+
+Exact terminal commands for a healthy local database are:
+
+```bash
+cp .env.example .env.local
+# edit .env.local and set DATABASE_URL, AUTH_SECRET, and OPENAI_API_KEY
+npm ci
+npm run prisma:generate
+npm run db:check
+npm run prisma:migrate
+npm run db:ready
+npm run typecheck
+```
+
+For managed Postgres, use a direct migration-capable connection string and run:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run prisma:migrate:deploy
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run db:ready
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run prisma:studio
+```
+
+## Voice Setup
+
+The `/chat` route is voice-first, but typed text remains available as a fallback.
+Voice input and output use server routes so API keys are never exposed to the
+browser.
+
+Speech-to-text is configured with:
+
+```env
+STT_PROVIDER="openai"
+OPENAI_API_KEY=""
+DEEPGRAM_API_KEY=""
+GOOGLE_API_KEY=""
+```
+
+`STT_PROVIDER` can be `openai`, `deepgram`, or `google`. OpenAI transcription
+uses `OPENAI_API_KEY`; Deepgram uses `DEEPGRAM_API_KEY`; Google Speech-to-Text
+uses `GOOGLE_API_KEY`. If the selected provider key is missing, the app returns
+a safe voice-transcription error and users can still type into chat.
+
+Persona voice output is configured with:
+
+```env
+ELEVENLABS_API_KEY=""
+```
+
+When `ELEVENLABS_API_KEY` is present, `/api/voice/tts` returns base64 MP3 audio
+for the selected natural devotional human voice profile. If it is missing or
+the browser blocks playback, the UI keeps the text answer visible and offers a
+browser speech or tap-to-play fallback where available.
+
+Voice observability is trace based. Speech-to-text returns a `voiceTraceId`,
+chat forwards that trace through scripture retrieval, and text-to-speech logs
+against the same trace when available. Trace events are stored in
+`ObservabilityEvent` with event types `stt`, `retrieval`, `chat`, and `tts`.
+
+## OM Audio Setup
+
+Place a looping OM audio file at:
+
+```text
+public/audio/om.mp3
+```
+
+Browsers block autoplay before user interaction, so Shri AI does not start OM
+audio on initial page load. The bottom-right `Enable Sound` control starts the
+loop after a click/tap, stores the on/off preference in `localStorage`, and uses
+the vertical slider for OM volume only. Missing `public/audio/om.mp3` disables
+the OM control gracefully and logs a development warning instead of crashing.
+
 ## Scripts
 
 - `npm run dev` starts the Next.js development server.
 - `npm run build` creates a production build.
 - `npm run lint` runs ESLint.
 - `npm run typecheck` runs TypeScript without emitting files.
+- `npm run db:check` verifies `DATABASE_URL`, generated Prisma Client, and database connectivity.
+- `npm run db:ready` verifies pgvector plus required app/RAG/observability tables.
+- `npm run prisma:generate` generates Prisma Client from `prisma/schema.prisma`.
 - `npm run prisma:migrate` applies Prisma migrations locally.
+- `npm run prisma:migrate:deploy` applies committed migrations to managed or production-like databases.
+- `npm run prisma:push` pushes the schema without migrations for throwaway development databases only.
 - `npm run prisma:studio` opens Prisma Studio.
+- `npm run scripture:build-corpus` regenerates the 300-record public-domain Bhagavad Gita v1 corpus from Wikisource.
+- `npm run scripture:validate` validates corpus shape, source/license metadata, and duplicate references.
+- `npm run scripture:ingest` idempotently upserts Bhagavad Gita records into Postgres.
+- `npm run scripture:embed` embeds missing Bhagavad Gita records and skips already embedded chunks.
+- `npm run scripture:prepare-reviews` idempotently creates missing pending review rows without resetting completed reviews.
+- `npm run scripture:eval` runs the 50-question retrieval evaluation with the hard accuracy gate.
+- `npm run release:check` verifies DB, migration, review, retrieval, environment, and Voice QA readiness gates.
 - `npm run format` formats files with Prettier.
+- `npm run format:check` verifies formatting without changing files.
+
+## Clean Clone Verification
+
+From a fresh checkout, use the lockfile and migration-based setup path:
+
+```bash
+npm ci
+npm run prisma:generate
+npx prisma validate
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run db:ready
+```
+
+The build uses deterministic system font fallbacks in `src/app/globals.css`
+instead of the Next.js Google-font module, so CI and local production builds do
+not depend on remote Google Font downloads. `db:ready` requires a configured
+PostgreSQL database with `pgvector` and the committed migrations applied.
+
+## Continuous Integration
+
+GitHub Actions is configured in `.github/workflows/ci.yml` to run the clean
+clone checks against a disposable `pgvector/pgvector:pg16` Postgres service:
+
+```text
+npm ci -> prisma:generate -> prisma validate -> prisma migrate deploy ->
+format:check -> lint -> typecheck -> test -> build -> db:ready
+```
+
+CI uses placeholder non-secret values only where build-time validation requires
+environment variables. Provider keys are not configured in CI, and the workflow
+must not depend on live AI, STT, or TTS providers.
+
+## Scripture RAG
+
+The v1 Bhagavad Gita corpus lives at:
+
+```text
+data/scriptures/bhagavad-gita/bhagavad-gita-besant-v1.json
+```
+
+It is generated from the 1922 Annie Besant Wikisource edition, using
+Wikisource as the public-domain source text reference. SanskritDocuments is not
+used because its site restricts copying/reposting for promotion or commercial
+use.
+
+Recommended local sequence:
+
+```bash
+npm run scripture:build-corpus
+npm run scripture:validate
+npm run scripture:ingest
+npm run scripture:embed
+npm run scripture:eval
+```
+
+Do not describe scripture retrieval as accurate unless `npm run scripture:eval`
+passes. The hard gate is Recall@5 >= 0.80, MRR >= 0.60, correct source rate >=
+0.95, unsupported-answer rate <= 0.05, and p95 retrieval latency <= 2500ms.
+
+## Human Scripture Review
+
+Automated retrieval metrics do not replace human theological review. The
+Bhagavad Gita corpus includes public-domain translation text plus
+project-authored commentary and practical notes; each chunk must be reviewed
+before it can be spoken in production guidance.
+
+Reviewer access is controlled server-side with comma-separated allowlists:
+
+```env
+REVIEWER_EMAILS="reviewer@example.com"
+ADMIN_EMAILS="admin@example.com"
+```
+
+Only those users can access `/admin/scripture-reviews`, view full review
+details or audit history, and mutate review decisions. Hidden buttons or client
+state are not trusted for authorization.
+
+Prepare review rows with:
+
+```bash
+npm run scripture:prepare-reviews
+```
+
+The command is idempotent: first runs create pending rows, repeated runs do not
+duplicate rows, and existing approved/rejected/needs-changes decisions are not
+reset. Chunks from inactive sources remain available for audit/review but are
+excluded from voice retrieval and release gates.
+
+Review statuses:
+
+- `pending`: not yet reviewed.
+- `in_review`: reserved for a reviewer actively examining the chunk.
+- `approved`: reviewed for text use; voice use also requires `approvedForVoice=true`.
+- `rejected`: not acceptable; a rejection reason is required.
+- `needs_changes`: correction is required; actionable reviewer notes are required.
+
+Voice approval requires an accuracy score and reviewer notes. Rejection and
+needs-changes decisions always clear `approvedForVoice`. The reviewer console
+uses optimistic concurrency with `updatedAt`; if two reviewers edit the same row,
+the stale submission is rejected and the reviewer must reload before
+resubmitting. Every decision writes a `ScriptureChunkReviewAudit` record with
+old state, new state, reviewer identity, notes, and timestamp.
+
+Policy for this staged release: text-mode scripture retrieval preserves current
+behavior, but voice-mode retrieval uses only chunks whose review is approved,
+`approvedForVoice=true`, source is active, and copyright status is
+`public_domain`, `public-domain`, or `licensed`. If there is not enough reviewed
+voice context, Shri AI must not fabricate a scriptural answer and returns:
+
+```text
+This topic has not yet been fully reviewed for spoken guidance. I can offer a general reflection or you may try another question.
+```
+
+Translation and commentary reflect a specific translation or interpretive
+tradition. Reviewer notes should record material interpretive concerns, source
+concerns, and any scope limits for use in spoken guidance.
+
+Review coverage is computed server-side in the reviewer console and includes
+total chunks, statuses, approved-for-text, approved-for-voice, reviewed
+percentage, voice-approved percentage, and counts by chapter, source, and
+persona.
+
+## Release Readiness
+
+Run:
+
+```bash
+npm run release:check
+```
+
+The command exits non-zero if any required gate fails. It verifies database
+reachability, required migrations and tables, corpus and review rows, the latest
+retrieval eval artifact, voice retrieval gating, voice-approved coverage,
+completed Voice QA for the target environment, and required environment
+configuration without printing secrets.
+
+Configurable staged-release thresholds:
+
+```env
+RELEASE_ENVIRONMENT="staging"
+RELEASE_MIN_VOICE_APPROVED_CHUNKS="1"
+RELEASE_MIN_VOICE_APPROVED_PERCENT="1"
+RELEASE_REQUIRE_COMPLETED_VOICE_QA="true"
+```
+
+For the first staged release, set the minimum chunk/percentage thresholds to the
+reviewed subset size. Do not lower the gates to bypass missing human review.
+With zero voice-approved chunks, `release:check` is expected to fail.
+
+Managed staging sequence:
+
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run prisma:migrate:deploy
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run db:ready
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run scripture:prepare-reviews
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run scripture:eval
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run release:check
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm run voice:qa:create -- --label="staging voice QA"
+```
+
+Do not claim managed staging verification unless these commands were actually
+run against the managed database.
+
+- `npm run scripture:ingest` ingests scripture data (e.g., Bhagavad Gita) into the database.
+- `npm run scripture:embed` generates embeddings for the ingested scriptures.
+- `npm run rag:evaluate` evaluates the performance of the RAG retrieval pipeline against test queries.
 
 ## Routes
 
