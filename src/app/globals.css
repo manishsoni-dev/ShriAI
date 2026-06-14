@@ -1,8 +1,17 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f5f7f6;
-  --foreground: #171717;
+  --background: #070504;
+  --foreground: #fff7df;
+  --font-geist-sans:
+    ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", "Noto Color Emoji";
+  --font-geist-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  --font-cormorant: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --font-noto-devanagari:
+    "Noto Serif Devanagari", "Mangal", "Sanskrit Text", serif;
 }
 
 @theme inline {
@@ -10,9 +19,108 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-cormorant);
+  --font-devanagari: var(--font-noto-devanagari);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+::selection {
+  background: rgba(245, 158, 11, 0.35);
+  color: #fff7df;
+}
+
+.devotional-cosmos {
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      rgba(245, 158, 11, 0.2),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 18% 28%,
+      rgba(69, 120, 255, 0.18),
+      transparent 26rem
+    ),
+    radial-gradient(
+      circle at 82% 22%,
+      rgba(168, 85, 247, 0.16),
+      transparent 27rem
+    ),
+    linear-gradient(135deg, #080504 0%, #130906 35%, #050816 68%, #080504 100%);
+  animation: cosmic-drift 24s ease-in-out infinite alternate;
+}
+
+.shri-prefix {
+  font-family: var(--font-devanagari), var(--font-serif), serif;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.particle-field {
+  background-image:
+    radial-gradient(circle, rgba(255, 236, 179, 0.6) 0 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255, 188, 82, 0.35) 0 1px, transparent 1.5px);
+  background-position:
+    0 0,
+    42px 60px;
+  background-size:
+    150px 150px,
+    190px 190px;
+  animation: particles-rise 32s linear infinite;
+  opacity: 0.32;
+}
+
+.divine-text-reveal {
+  animation: divine-text-reveal 0.45s ease both;
+}
+
+@keyframes cosmic-drift {
+  from {
+    filter: saturate(0.94) brightness(0.86);
+    transform: scale(1);
+  }
+  to {
+    filter: saturate(1.18) brightness(1);
+    transform: scale(1.035);
+  }
+}
+
+@keyframes particles-rise {
+  from {
+    background-position:
+      0 0,
+      42px 60px;
+  }
+  to {
+    background-position:
+      0 -420px,
+      42px -520px;
+  }
+}
+
+@keyframes divine-text-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    text-shadow: 0 0 18px rgba(245, 158, 11, 0.45);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    text-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
 }

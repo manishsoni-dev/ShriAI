@@ -55,3 +55,15 @@ __pycache__/
 *.log
 .idea/
 .vscode/
+
+# Build caches
+.cache/
+.vite/
+.prisma/
+
+# Uploads & Outputs
+uploads/
+eval-results/
+
+# OS
+__MACOSX/
