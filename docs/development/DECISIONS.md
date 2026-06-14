@@ -17,5 +17,5 @@
 
 ## D004: Version Pinning
 
-- **Decision**: Pin Node.js to `22.12.0` for local and CI runtime selection via `.node-version`; require Node.js `>=22.12.0` and npm `>=10.0.0` in `package.json`.
+- **Decision**: Pin Node.js to `22.13.0` for local and CI runtime selection via `.node-version`; require Node.js `>=22.13.0` and npm `>=10.0.0` in `package.json`.
 - **Reasoning**: Ensures consistent dependency resolution and satisfies current dependency engine requirements, including Next.js and Prisma transitive packages under `engine-strict=true`. Enforced via `.npmrc` and `.node-version`.

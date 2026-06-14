@@ -27,8 +27,8 @@ documentation gaps, establish a stable reviewable baseline, and complete Prompt
    `composerValue` declaration in `src/app/chat/chat-shell.tsx`. Those changes
    were preserved in named Git stashes and excluded from the Prompt 1-3
    closeout baseline.
-6. `.node-version` selects Node `22.12.0`; `package.json` requires Node
-   `>=22.12.0` and npm `>=10.0.0`; `.npmrc` enables `engine-strict=true`; CI
+6. `.node-version` selects Node `22.13.0`; `package.json` requires Node
+   `>=22.13.0` and npm `>=10.0.0`; `.npmrc` enables `engine-strict=true`; CI
    reads `.node-version` and runs `npm ci`.
 7. GitHub Actions workflow exists at `.github/workflows/ci.yml` and mirrors the
    clean-clone command order using a disposable `pgvector/pgvector:pg16`
@@ -193,9 +193,10 @@ git status --short
 - `npm ci`: passed after closeout commit; reported existing npm audit advisories
   that are out of scope for this task.
 - Remote CI after publishing initially failed at `npm ci` because
-  `@prisma/streams-local@0.1.2` requires Node `>=22.0.0`, while CI was pinned
-  to Node `20.19.0`. The runtime pin was updated to Node `22.12.0`, and
-  GitHub Actions checkout/setup-node actions were updated to v6.
+  `@prisma/streams-local@0.1.2` requires Node `>=22.0.0`, while
+  `eslint-visitor-keys@5.0.1` requires Node `^22.13.0` on the Node 22 path.
+  The runtime pin was updated to Node `22.13.0`, and GitHub Actions
+  checkout/setup-node actions were updated to v6.
 - `npm run test`: 90 tests passed across 14 test files.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
