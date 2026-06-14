@@ -28,7 +28,7 @@ Shri AI is a full-stack AI assistant foundation with authentication, workspace-a
 
 ## Runtime Requirements
 
-- Node.js `20.19.0` or newer.
+- Node.js `22.12.0` or newer.
 - npm `10.0.0` or newer.
 - Use `npm ci` for reproducible dependency installation from `package-lock.json`.
 - `.npmrc` enables `engine-strict=true`, so unsupported Node/npm versions fail early.
