@@ -118,6 +118,27 @@ export class OpenAIProvider implements AIProvider {
   async embedText(input: EmbedTextInput): Promise<EmbedTextResult> {
     const model = input.model ?? openAIConfig.models.embeddingModel;
 
+    // Use local embeddings if we have a dummy API key
+    if (openAIConfig.apiKey === "replace-with-your-openai-api-key" || !openAIConfig.apiKey) {
+      console.log("Using local transformer for embedText fallback");
+      const { pipeline } = await import("@xenova/transformers");
+      const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+      const output = await extractor(input.text, { pooling: "mean", normalize: true });
+      
+      const baseVector = Array.from(output.data);
+      const paddedVector = new Array(openAIConfig.models.embeddingDimensions).fill(0);
+      for (let j = 0; j < baseVector.length; j++) {
+        paddedVector[j] = baseVector[j] as number;
+      }
+
+      return {
+        embedding: paddedVector,
+        provider: "local-transformers",
+        model: "Xenova/all-MiniLM-L6-v2",
+        usage: { inputTokens: 0, totalTokens: 0 },
+      };
+    }
+
     return withAIRetry(
       async () => {
         const response = await this.client.embeddings.create({

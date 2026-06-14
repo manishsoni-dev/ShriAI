@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 
+import { PersonaSymbol } from "@/app/_components/persona-symbol";
 import { personas, type Persona } from "@/lib/personas";
 
 type PersonaStyle = CSSProperties & {
@@ -138,7 +139,7 @@ export function SectionHeader({
 export function PersonaGlyph({ persona }: { persona: Persona }) {
   return (
     <span
-      className="grid h-12 w-12 place-items-center rounded-full border border-[color:var(--persona-color)]/35 bg-white/5 text-xs font-semibold uppercase tracking-[0.18em] text-amber-50 shadow-[0_0_26px_var(--persona-glow)]"
+      className="grid h-12 w-12 place-items-center rounded-full border border-[color:var(--persona-color)]/35 bg-white/5 text-amber-50 shadow-[0_0_26px_var(--persona-glow)]"
       style={
         {
           "--persona-color": persona.color,
@@ -146,7 +147,11 @@ export function PersonaGlyph({ persona }: { persona: Persona }) {
         } as PersonaStyle
       }
     >
-      {persona.icon}
+      <PersonaSymbol
+        className="h-8 w-8 opacity-25"
+        personaId={persona.id}
+        style={{ color: persona.color }}
+      />
     </span>
   );
 }

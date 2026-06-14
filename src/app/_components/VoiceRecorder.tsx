@@ -2,20 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type VoiceState =
-  | "idle"
-  | "requesting"
-  | "recording"
-  | "transcribing"
-  | "thinking"
-  | "speaking"
-  | "error";
+import type { ConversationPhase } from "@/lib/conversation-state";
+
+export type { ConversationPhase } from "@/lib/conversation-state";
 
 type Props = {
   personaDisplayName: string;
   disabled?: boolean;
   idleLabel?: string;
-  voiceState: VoiceState;
+  voiceState: ConversationPhase;
   onTranscript: (text: string, voiceTraceId?: string) => void;
   onError: (message: string) => void;
   onPermissionRequest?: () => void;
@@ -24,13 +19,15 @@ type Props = {
   onInterruptSpeaking?: () => void;
 };
 
-const STATUS_LABELS: Record<VoiceState, string> = {
+const STATUS_LABELS: Record<ConversationPhase, string> = {
   idle: "Tap the mic and speak your question",
-  requesting: "Requesting microphone access...",
-  recording: "Listening...",
+  listening: "Listening...",
   transcribing: "Transcribing your words...",
+  retrieving: "Consulting scripture...",
   thinking: "Seeking divine guidance...",
+  streaming: "Receiving guidance...",
   speaking: "Speaking response...",
+  interrupted: "Interrupted",
   error: "Something went wrong",
 };
 
@@ -70,11 +67,12 @@ export function VoiceRecorder({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
-  const isRecording = voiceState === "recording";
-  const isInterruptingPlayback = voiceState === "speaking";
+  const isRecording = voiceState === "listening";
+  const isInterruptingPlayback =
+    voiceState === "speaking" || voiceState === "streaming";
   const isBusy =
-    voiceState === "requesting" ||
     voiceState === "transcribing" ||
+    voiceState === "retrieving" ||
     voiceState === "thinking";
 
   // Check if MediaRecorder is available
@@ -261,7 +259,7 @@ export function VoiceRecorder({
             ? "text-red-400"
             : voiceState === "speaking"
               ? "text-amber-300"
-              : voiceState === "recording"
+              : voiceState === "listening"
                 ? "text-green-400"
                 : "text-amber-200/60"
         }`}
@@ -349,9 +347,13 @@ function MicIcon({
   voiceState,
 }: {
   isRecording: boolean;
-  voiceState: VoiceState;
+  voiceState: ConversationPhase;
 }) {
-  if (voiceState === "transcribing" || voiceState === "thinking") {
+  if (
+    voiceState === "transcribing" ||
+    voiceState === "thinking" ||
+    voiceState === "retrieving"
+  ) {
     // Spinner
     return (
       <svg

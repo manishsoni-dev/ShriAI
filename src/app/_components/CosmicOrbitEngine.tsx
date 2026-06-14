@@ -339,7 +339,7 @@ function drawCentralGlow(
 
   ctx.globalAlpha = 0.42 * intensity;
   ctx.fillStyle = "#fff2c6";
-  ctx.shadowBlur = 24;
+  ctx.shadowBlur = 12;
   ctx.shadowColor = "#f6b44b";
   ctx.beginPath();
   ctx.arc(cx, cy, 5.5 * intensity, 0, Math.PI * 2);
@@ -553,7 +553,7 @@ function drawBody(
   litSurface.addColorStop(0.78, body.shadowColor);
   litSurface.addColorStop(1, "#020407");
 
-  ctx.shadowBlur = 8 + eclipseIntensity * 14;
+  ctx.shadowBlur = 4 + eclipseIntensity * 8;
   ctx.shadowColor = body.atmosphereColor;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -630,6 +630,8 @@ function drawEclipsePulse(
   ctx.restore();
 }
 
+const TARGET_FRAME_MS = 1000 / 30;
+
 export function CosmicOrbitEngine({
   className = "pointer-events-none absolute inset-0 h-full w-full",
   opacity = 0.64,
@@ -655,6 +657,7 @@ export function CosmicOrbitEngine({
 
     let animationId: number | null = null;
     let startTime: number | null = null;
+    let lastFrameTime = 0;
     let width = 0;
     let height = 0;
     const pulseStates: { radius: number; alpha: number }[] = BODIES.map(() => ({
@@ -697,6 +700,12 @@ export function CosmicOrbitEngine({
       animationId = null;
       if (!width || !height) return;
 
+      if (!prefersReduced && timestamp - lastFrameTime < TARGET_FRAME_MS) {
+        schedule();
+        return;
+      }
+
+      lastFrameTime = timestamp;
       if (startTime === null) startTime = timestamp;
       const elapsed = (timestamp - startTime) / 1000;
 

@@ -18,14 +18,6 @@ export type VoiceProfile = {
   maxTtsChars: number;
   /** Preferred gender hint for voice selection. */
   gender: "male" | "female" | "neutral";
-  /**
-   * ElevenLabs voice ID for premium TTS.
-   * See: https://api.elevenlabs.io/v1/voices
-   * These are default IDs — replace with your preferred ElevenLabs voices.
-   */
-  elevenLabsVoiceId: string;
-  /** ElevenLabs model — multilingual v2 handles Sanskrit pronunciation better. */
-  elevenLabsModel: string;
 };
 
 export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
@@ -44,8 +36,6 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
     volume: 0.84,
     maxTtsChars: 1000,
     gender: "male",
-    elevenLabsVoiceId: "pNInz6obpgDQGcFmaJgB", // Adam — deep, clear male
-    elevenLabsModel: "eleven_multilingual_v2",
   },
   krishna: {
     // Warm, graceful, intelligent — gentle confidence, slightly musical
@@ -62,8 +52,6 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
     volume: 0.86,
     maxTtsChars: 1000,
     gender: "male",
-    elevenLabsVoiceId: "VR6AewLTigWG4xSOukaG", // Arnold — warm, confident
-    elevenLabsModel: "eleven_multilingual_v2",
   },
   shiva: {
     // Deep, meditative — slow pace, spacious pauses, low intensity
@@ -73,8 +61,6 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
     volume: 0.8,
     maxTtsChars: 1000,
     gender: "male",
-    elevenLabsVoiceId: "TxGEqnHWrfWFTfGW9XjX", // Josh — deep, meditative
-    elevenLabsModel: "eleven_multilingual_v2",
   },
   hanuman: {
     // Strong, humble, energetic — clear articulation, devotional courage
@@ -84,8 +70,6 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
     volume: 0.88,
     maxTtsChars: 1000,
     gender: "male",
-    elevenLabsVoiceId: "yoZ06aMxZJJ28mfd3POQ", // Sam — strong, clear
-    elevenLabsModel: "eleven_multilingual_v2",
   },
   sita: {
     // Calm, resilient — soft but firm, dignified emotional strength
@@ -103,8 +87,6 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
     volume: 0.82,
     maxTtsChars: 1000,
     gender: "female",
-    elevenLabsVoiceId: "21m00Tcm4TlvDq8ikWAM", // Rachel — calm, clear female
-    elevenLabsModel: "eleven_multilingual_v2",
   },
   radha: {
     // Soft, devotional — lyrical, emotionally refined
@@ -122,8 +104,6 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
     volume: 0.8,
     maxTtsChars: 1000,
     gender: "female",
-    elevenLabsVoiceId: "AZnzlk1XvdvUeBnXmlld", // Domi — soft, expressive female
-    elevenLabsModel: "eleven_multilingual_v2",
   },
 };
 

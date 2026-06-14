@@ -16,8 +16,13 @@ Shri AI uses Auth.js through `next-auth@beta` with the Next.js App Router.
 
 The current foundation uses an email/password credentials provider so the app is runnable without configuring an OAuth app.
 
-- If the email already exists, the password is verified with `bcryptjs`.
-- If the email does not exist, a new `User` is created with the provided name and hashed password.
-- After every successful sign-in, `ensureDefaultWorkspace` creates an owner workspace if the user does not already belong to one.
+- Sign-in verifies an existing email/password pair with `bcryptjs`.
+- Registration is explicit. It creates a new `User` with the provided name and
+  hashed password, then signs the user in.
+- After every successful sign-in or registration, `ensureDefaultWorkspace`
+  creates an owner workspace if the user does not already belong to one.
+- The `OWNER` role applies only to that user's own default workspace.
+- Reviewer and administrator permissions are never assigned from registration;
+  they are controlled separately by `REVIEWER_EMAILS` and `ADMIN_EMAILS`.
 
 OAuth providers can be added later in `src/auth.ts` without changing dashboard route protection.

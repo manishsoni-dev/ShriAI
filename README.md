@@ -28,7 +28,7 @@ Shri AI is a full-stack AI assistant foundation with authentication, workspace-a
 
 ## Runtime Requirements
 
-- Node.js `22.12.0` or newer.
+- Node.js `22.13.0` or newer.
 - npm `10.0.0` or newer.
 - Use `npm ci` for reproducible dependency installation from `package-lock.json`.
 - `.npmrc` enables `engine-strict=true`, so unsupported Node/npm versions fail early.
@@ -217,17 +217,13 @@ against the same trace when available. Trace events are stored in
 
 ## OM Audio Setup
 
-Place a looping OM audio file at:
-
-```text
-public/audio/om.mp3
-```
-
-Browsers block autoplay before user interaction, so Shri AI does not start OM
-audio on initial page load. The bottom-right `Enable Sound` control starts the
-loop after a click/tap, stores the on/off preference in `localStorage`, and uses
-the vertical slider for OM volume only. Missing `public/audio/om.mp3` disables
-the OM control gracefully and logs a development warning instead of crashing.
+Shri AI generates the ambient OM tone with the browser Web Audio API, so there
+is no runtime audio download and no bundled chanting file to manage. Browsers
+block audio before user interaction, so the bottom-right control waits for a
+click/tap/key gesture, stores enabled and volume preferences in `localStorage`,
+and moves between `Paused`, `Ready`, and playing `OM` states. The vertical
+slider is capped for gentle ambient volume, and browsers without Web Audio mark
+the control unavailable instead of crashing.
 
 ## Scripts
 
@@ -425,14 +421,19 @@ run against the managed database.
 ## Routes
 
 - `/` landing page.
-- `/sign-in` email/password sign-in and first-time account creation.
-- `/dashboard` protected placeholder route. Unauthenticated users are redirected to `/sign-in`.
+- `/sign-in` email/password sign-in plus explicit registration.
+- `/dashboard` protected user workspace route. Unauthenticated users are redirected to `/sign-in`.
 
 ## Authentication
 
 Auth.js is configured in `src/auth.ts`. Supporting user and workspace creation lives under `src/lib/auth` and `src/lib/workspaces.ts` so route components do not own authentication details.
 
-The current local credentials flow creates a `User` record on first sign-in and ensures that user has an owner `Workspace`. Existing users must provide the same password they used when the account was created.
+The local credentials flow distinguishes sign-in from registration. Sign-in
+verifies an existing user with `bcryptjs`; registration explicitly creates a
+new `User` and then signs the user in. Every authenticated user receives an
+owner role only on their own default workspace. Reviewer and administrator
+access is not granted by registration and remains controlled by
+`REVIEWER_EMAILS` and `ADMIN_EMAILS`.
 
 ## Conversations
 

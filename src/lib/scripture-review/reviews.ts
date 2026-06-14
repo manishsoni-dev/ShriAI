@@ -300,6 +300,7 @@ export async function mutateScriptureReview(rawInput: unknown) {
           accuracyScore: decision.accuracyScore,
           interpretationNotes: decision.interpretationNotes,
           rejectionReason: decision.rejectionReason,
+          reviewOrigin: "human",
         },
       });
 

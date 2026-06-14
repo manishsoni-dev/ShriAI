@@ -60,6 +60,13 @@ const SOURCE_REGISTRY: Record<string, SourceMeta> = {
     copyrightStatus: "public_domain",
     priority: 9,
   },
+  "isha-upanishad": {
+    canonicalTitle: "Isha Upanishad",
+    tradition: "Vedanta",
+    language: "sanskrit",
+    copyrightStatus: "public_domain",
+    priority: 10,
+  },
 };
 
 async function main() {
@@ -164,15 +171,30 @@ async function main() {
 
     console.log(`  📖 ${sourceMeta.canonicalTitle} - ${filePath}`);
 
-    // Check for duplicate IDs in file
+    // Check for duplicate IDs in file and validate size/templates
     const ids = new Set();
     const uniqueChunks = [];
     let duplicatesInFile = 0;
+    let failedValidationCount = 0;
 
     for (const chunk of validChunks) {
       if (ids.has(chunk.id)) {
         duplicatesInFile++;
       } else {
+        // Enforce max text sizes to prevent oversized chunks
+        if (chunk.translation.length > 2500 || (chunk.commentary && chunk.commentary.length > 2500)) {
+           console.warn(`     ⚠ Oversized chunk rejected: ${chunk.id}`);
+           failedValidationCount++;
+           continue;
+        }
+        
+        // Prevent generic templated commentaries or practical notes
+        if (chunk.commentary && chunk.commentary.toLowerCase().includes("lorem ipsum")) {
+           console.warn(`     ⚠ Templated commentary rejected: ${chunk.id}`);
+           failedValidationCount++;
+           continue;
+        }
+
         ids.add(chunk.id);
         uniqueChunks.push(chunk);
       }
@@ -181,6 +203,8 @@ async function main() {
     console.log(`     Records accepted: ${uniqueChunks.length}`);
     if (duplicatesInFile > 0)
       console.log(`     Duplicate records ignored: ${duplicatesInFile}`);
+    if (failedValidationCount > 0)
+      console.log(`     Validation failures ignored: ${failedValidationCount}`);
 
     if (isDryRun) {
       totalUpserted += uniqueChunks.length;

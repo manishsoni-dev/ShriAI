@@ -157,7 +157,8 @@ export async function POST(request: Request) {
       payload: {
         provider,
         audioBytes: audioField.size,
-        transcript: text,
+        transcriptLength: text.length,
+        transcriptPreview: text.replace(/\s+/g, " ").trim().slice(0, 120),
       },
     });
 

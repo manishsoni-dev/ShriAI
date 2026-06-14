@@ -15,6 +15,12 @@ import {
   getConversation,
   listMessages,
 } from "@/lib/conversations";
+import {
+  createTurnId,
+  normalizeInteractionMode,
+  type ConversationPhase,
+  type TerminalStatus,
+} from "@/lib/conversation-state";
 import { db } from "@/lib/db";
 import { semanticSearch } from "@/lib/knowledge-search";
 import { logObservabilityEvent } from "@/lib/observability";
@@ -33,9 +39,12 @@ import { crisisSupportMessage, detectCrisisIntent } from "@/lib/safety/crisis";
 
 type StreamRequest = {
   conversationId?: string;
+  interactionMode?: string;
   message?: string;
   personaId?: string;
+  source?: "text" | "voice";
   traceId?: string;
+  turnId?: string;
 };
 
 function streamEvent(event: unknown) {
@@ -56,6 +65,74 @@ function serializeMessage(message: {
   };
 }
 
+function phaseEvent(input: {
+  phase: ConversationPhase;
+  traceId: string;
+  turnId: string;
+}) {
+  return {
+    type: "phase",
+    phase: input.phase,
+    traceId: input.traceId,
+    turnId: input.turnId,
+  };
+}
+
+function doneEvent(input: {
+  status: TerminalStatus;
+  traceId: string;
+  turnId: string;
+}) {
+  return {
+    type: "done",
+    status: input.status,
+    traceId: input.traceId,
+    turnId: input.turnId,
+  };
+}
+
+function safePreview(content: string) {
+  return content.replace(/\s+/g, " ").trim().slice(0, 160);
+}
+
+const HISTORY_MAX_MESSAGES = 12;
+const HISTORY_MAX_CHARS = 8000;
+
+function buildBoundedHistory(
+  messages: Array<{
+    content: string;
+    role: "user" | "assistant" | "system" | "tool";
+  }>,
+): AIMessage[] {
+  const history: AIMessage[] = [];
+  let totalChars = 0;
+
+  for (const message of messages.toReversed()) {
+    if (message.role !== "user" && message.role !== "assistant") {
+      continue;
+    }
+
+    const content = message.content.trim();
+    if (!content) continue;
+
+    const nextTotal = totalChars + content.length;
+    if (
+      history.length >= HISTORY_MAX_MESSAGES ||
+      nextTotal > HISTORY_MAX_CHARS
+    ) {
+      break;
+    }
+
+    history.unshift({
+      role: message.role,
+      content,
+    });
+    totalChars = nextTotal;
+  }
+
+  return history;
+}
+
 // ── Scripture retrieval (primary RAG source) ──────────────────────────────────
 
 async function getScriptureRAGContext(input: {
@@ -65,6 +142,7 @@ async function getScriptureRAGContext(input: {
   traceId: string;
   userId: string;
   conversationId: string;
+  source: "text" | "voice";
 }): Promise<ScriptureRetrievalResult | null> {
   if (!isPersonaId(input.personaId)) return null;
 
@@ -72,7 +150,7 @@ async function getScriptureRAGContext(input: {
     return await retrieveScriptureContext({
       query: input.query,
       personaId: input.personaId,
-      mode: "voice",
+      mode: input.source,
       limit: 6,
       debugMode: input.isDevMode,
       threshold: 0,
@@ -208,10 +286,25 @@ export async function POST(request: Request) {
   const content = body?.message?.trim();
   const requestedPersonaId = body?.personaId;
   const traceId = body?.traceId ?? crypto.randomUUID();
+  const turnId =
+    typeof body?.turnId === "string" && body.turnId.trim()
+      ? body.turnId.trim()
+      : createTurnId();
+  const interactionMode = normalizeInteractionMode({
+    interactionMode: body?.interactionMode,
+    legacySource: body?.source,
+  });
 
   if (!conversationId || !content) {
     return NextResponse.json(
       { error: "conversationId and message are required." },
+      { status: 400 },
+    );
+  }
+
+  if (!interactionMode) {
+    return NextResponse.json(
+      { error: "interactionMode must be text or voice." },
       { status: 400 },
     );
   }
@@ -229,6 +322,7 @@ export async function POST(request: Request) {
       conversationId: conversation.id,
       limit: 20,
     });
+    const history = buildBoundedHistory(previousMessages);
 
     // Duplicate send prevention
     if (previousMessages.length > 0) {
@@ -290,8 +384,12 @@ export async function POST(request: Request) {
           provider: "safety",
           model: "crisis-routing",
           grounding: "crisis-support",
+          interactionMode,
+          personaId: persona.id,
           spokenAnswer: answer,
           traceId,
+          turnId,
+          voiceEligible: interactionMode === "voice",
         },
       });
 
@@ -306,8 +404,12 @@ export async function POST(request: Request) {
         model: "crisis-routing",
         latencyMs: Date.now() - startedAt,
         payload: {
-          userQuery: content,
+          contentPreview: safePreview(content),
+          contentLength: content.length,
+          interactionMode,
           safetyRoute: "crisis",
+          status: "completed",
+          turnId,
         },
       });
 
@@ -316,9 +418,16 @@ export async function POST(request: Request) {
         start(controller) {
           controller.enqueue(
             encoder.encode(
+              streamEvent(phaseEvent({ phase: "streaming", traceId, turnId })),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
               streamEvent({
                 type: "user-message",
                 message: serializeMessage(userMessage),
+                traceId,
+                turnId,
               }),
             ),
           );
@@ -327,6 +436,8 @@ export async function POST(request: Request) {
               streamEvent({
                 type: "assistant-delta",
                 text: answer,
+                traceId,
+                turnId,
               }),
             ),
           );
@@ -338,7 +449,13 @@ export async function POST(request: Request) {
                 spokenAnswer: answer,
                 citations: [],
                 traceId,
+                turnId,
               }),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(doneEvent({ status: "completed", traceId, turnId })),
             ),
           );
           controller.close();
@@ -362,6 +479,7 @@ export async function POST(request: Request) {
         traceId,
         userId: user.id,
         conversationId: conversation.id,
+        source: interactionMode,
       }),
       getWorkspaceDocumentContext({
         userId: user.id,
@@ -384,11 +502,23 @@ export async function POST(request: Request) {
             streamEvent({
               type: "user-message",
               message: serializeMessage(userMessage),
+              traceId,
+              turnId,
             }),
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(
+            streamEvent(phaseEvent({ phase: "retrieving", traceId, turnId })),
           ),
         );
 
         try {
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(phaseEvent({ phase: "thinking", traceId, turnId })),
+            ),
+          );
           const streamGen = streamGroundedAnswer({
             query: content,
             persona,
@@ -397,13 +527,16 @@ export async function POST(request: Request) {
             insufficientContext: ragResult?.insufficientContext ?? false,
             insufficientApprovedContext:
               ragResult?.insufficientApprovedContext ?? false,
-            history: previousMessages.map((msg) => ({
-              role: msg.role as AIMessage["role"],
-              content: msg.content,
-            })),
+            history,
+            usageContext: {
+              userId: user.id,
+              workspaceId: conversation.workspaceId,
+              conversationId: conversation.id,
+            },
             signal: abortSignal,
           });
 
+          let firstTokenLatencyMs: number | null = null;
           let finalAnswer: GroundedAnswer | null = null;
 
           for await (const event of streamGen) {
@@ -412,11 +545,24 @@ export async function POST(request: Request) {
             }
 
             if (event.type === "delta") {
+              if (firstTokenLatencyMs === null) {
+                firstTokenLatencyMs = Date.now() - startedAt;
+                controller.enqueue(
+                  encoder.encode(
+                    streamEvent(
+                      phaseEvent({ phase: "streaming", traceId, turnId }),
+                    ),
+                  ),
+                );
+              }
+
               controller.enqueue(
                 encoder.encode(
                   streamEvent({
                     type: "assistant-delta",
                     text: event.text,
+                    traceId,
+                    turnId,
                   }),
                 ),
               );
@@ -426,6 +572,13 @@ export async function POST(request: Request) {
           }
 
           if (abortSignal.aborted) {
+            controller.enqueue(
+              encoder.encode(
+                streamEvent(
+                  doneEvent({ status: "cancelled", traceId, turnId }),
+                ),
+              ),
+            );
             controller.close();
             return;
           }
@@ -448,11 +601,17 @@ export async function POST(request: Request) {
             role: "assistant",
             content: finalAnswer.displayAnswer,
             metadata: {
-              provider: "ai-gateway",
-              model: "gpt-4o-mini", // Passed dynamically if available, otherwise default
+              provider: finalAnswer.metadata?.provider ?? "ai-gateway",
+              model: finalAnswer.metadata?.model ?? "configured-chat-model",
               grounding: finalAnswer.grounding,
+              interactionMode,
+              personaId: persona.id,
+              retrievalMode: ragResult?.mode ?? interactionMode,
               spokenAnswer: finalAnswer.spokenAnswer,
+              status: "completed",
               traceId,
+              turnId,
+              voiceEligible: interactionMode === "voice",
             },
           });
 
@@ -473,11 +632,15 @@ export async function POST(request: Request) {
             conversationId: conversation.id,
             messageId: assistantMessage.id,
             personaId: persona.id,
-            model: "gpt-4o-mini",
+            model: finalAnswer.metadata?.model,
             latencyMs: Date.now() - startedAt,
             payload: {
-              userQuery: content,
-              transcript: content,
+              contentLength: content.length,
+              contentPreview: safePreview(content),
+              firstTokenLatencyMs,
+              finalStatus: "completed",
+              historyMessages: history.length,
+              interactionMode,
               retrievedChunks: ragResult?.chunks.map((chunk) => ({
                 id: chunk.id,
                 canonicalRef: chunk.canonicalRef,
@@ -489,6 +652,11 @@ export async function POST(request: Request) {
               })),
               finalCitations: finalAnswer.citations,
               grounding: finalAnswer.grounding,
+              provider: finalAnswer.metadata?.provider,
+              requestId: finalAnswer.metadata?.requestId,
+              tokenUsage: finalAnswer.metadata?.usage,
+              retrievedChunkCount: ragResult?.chunks.length ?? 0,
+              turnId,
             },
           });
 
@@ -500,15 +668,28 @@ export async function POST(request: Request) {
                 spokenAnswer: finalAnswer.spokenAnswer,
                 citations: finalAnswer.citations,
                 traceId,
+                turnId,
                 ...(isDevMode && ragResult?.debug
                   ? { ragDebug: ragResult.debug }
                   : {}),
               }),
             ),
           );
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(doneEvent({ status: "completed", traceId, turnId })),
+            ),
+          );
           controller.close();
         } catch (error) {
           if (abortSignal.aborted) {
+            controller.enqueue(
+              encoder.encode(
+                streamEvent(
+                  doneEvent({ status: "cancelled", traceId, turnId }),
+                ),
+              ),
+            );
             controller.close();
             return;
           }
@@ -527,9 +708,12 @@ export async function POST(request: Request) {
             personaId: persona.id,
             latencyMs: Date.now() - startedAt,
             payload: {
-              userQuery: content,
-              transcript: content,
+              contentLength: content.length,
+              contentPreview: safePreview(content),
               error: error instanceof Error ? error.message : String(error),
+              finalStatus: "failed",
+              interactionMode,
+              turnId,
             },
           });
 
@@ -539,7 +723,13 @@ export async function POST(request: Request) {
                 type: "error",
                 error: message,
                 traceId,
+                turnId,
               }),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(doneEvent({ status: "failed", traceId, turnId })),
             ),
           );
           controller.close();

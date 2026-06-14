@@ -1,0 +1,257 @@
+{
+  "version": "v1",
+  "hash": "175543610be771a2",
+  "creationDate": "2026-06-15T09:33:59.979Z",
+  "author": "Shri AI Assessment System",
+  "purpose": "Retrieval Validation",
+  "allowedUse": "evaluation-only",
+  "cases": [
+    {
+      "id": "gita-eval-016",
+      "question": "How do wise people act for the good of others?",
+      "personaId": "krishna",
+      "themes": [
+        "action"
+      ],
+      "expectedRefs": [
+        "3.20",
+        "3.21",
+        "3.25"
+      ],
+      "acceptableChapters": [
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-017",
+      "question": "What causes spiritual confusion?",
+      "personaId": "krishna",
+      "themes": [
+        "confusion"
+      ],
+      "expectedRefs": [
+        "2.7",
+        "2.52",
+        "3.39"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-018",
+      "question": "How does wisdom relate to action?",
+      "personaId": "krishna",
+      "themes": [
+        "wisdom",
+        "action"
+      ],
+      "expectedRefs": [
+        "4.18",
+        "4.19",
+        "4.23"
+      ],
+      "acceptableChapters": [
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-019",
+      "question": "What is sacred action?",
+      "personaId": "krishna",
+      "themes": [
+        "sacred-action"
+      ],
+      "expectedRefs": [
+        "3.9",
+        "4.24",
+        "4.25"
+      ],
+      "acceptableChapters": [
+        3,
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-020",
+      "question": "How is knowledge preserved and restored?",
+      "personaId": "krishna",
+      "themes": [
+        "wisdom"
+      ],
+      "expectedRefs": [
+        "4.1",
+        "4.2",
+        "4.7"
+      ],
+      "acceptableChapters": [
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-021",
+      "question": "When does Krishna say he manifests?",
+      "personaId": "krishna",
+      "themes": [
+        "devotion"
+      ],
+      "expectedRefs": [
+        "4.7",
+        "4.8"
+      ],
+      "acceptableChapters": [
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-022",
+      "question": "How do I approach a teacher or wisdom tradition?",
+      "personaId": "krishna",
+      "themes": [
+        "wisdom"
+      ],
+      "expectedRefs": [
+        "4.34",
+        "4.35"
+      ],
+      "acceptableChapters": [
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-023",
+      "question": "Can knowledge purify a person?",
+      "personaId": "krishna",
+      "themes": [
+        "wisdom"
+      ],
+      "expectedRefs": [
+        "4.36",
+        "4.37",
+        "4.38"
+      ],
+      "acceptableChapters": [
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-024",
+      "question": "How should I respond to doubt?",
+      "personaId": "krishna",
+      "themes": [
+        "doubt",
+        "wisdom"
+      ],
+      "expectedRefs": [
+        "4.40",
+        "4.41",
+        "4.42"
+      ],
+      "acceptableChapters": [
+        4
+      ]
+    },
+    {
+      "id": "gita-eval-025",
+      "question": "What is real renunciation?",
+      "personaId": "krishna",
+      "themes": [
+        "renunciation"
+      ],
+      "expectedRefs": [
+        "5.2",
+        "5.3",
+        "5.10"
+      ],
+      "acceptableChapters": [
+        5
+      ]
+    },
+    {
+      "id": "gita-eval-026",
+      "question": "How can I act and remain unstained?",
+      "personaId": "krishna",
+      "themes": [
+        "detachment"
+      ],
+      "expectedRefs": [
+        "5.7",
+        "5.10",
+        "5.11"
+      ],
+      "acceptableChapters": [
+        5
+      ]
+    },
+    {
+      "id": "gita-eval-027",
+      "question": "Where does peace come from?",
+      "personaId": "krishna",
+      "themes": [
+        "peace"
+      ],
+      "expectedRefs": [
+        "2.66",
+        "2.71",
+        "5.12"
+      ],
+      "acceptableChapters": [
+        2,
+        5
+      ]
+    },
+    {
+      "id": "gita-eval-028",
+      "question": "How should I see all beings?",
+      "personaId": "krishna",
+      "themes": [
+        "wisdom"
+      ],
+      "expectedRefs": [
+        "5.18",
+        "5.19",
+        "6.29"
+      ],
+      "acceptableChapters": [
+        5,
+        6
+      ]
+    },
+    {
+      "id": "gita-eval-029",
+      "question": "How can I endure external contact and discomfort?",
+      "personaId": "krishna",
+      "themes": [
+        "steadiness"
+      ],
+      "expectedRefs": [
+        "2.14",
+        "5.22",
+        "6.7"
+      ],
+      "acceptableChapters": [
+        2,
+        5,
+        6
+      ]
+    },
+    {
+      "id": "gita-eval-030",
+      "question": "What is the inner happiness of yoga?",
+      "personaId": "krishna",
+      "themes": [
+        "meditation"
+      ],
+      "expectedRefs": [
+        "5.21",
+        "6.20",
+        "6.21"
+      ],
+      "acceptableChapters": [
+        5,
+        6
+      ]
+    }
+  ]
+}

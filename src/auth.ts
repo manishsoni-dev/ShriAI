@@ -3,7 +3,7 @@ import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
 import { env } from "@/env";
-import { InvalidCredentialsError, signInOrCreateUser } from "@/lib/auth/users";
+import { InvalidCredentialsError, verifyCredentials } from "@/lib/auth/users";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -34,7 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         try {
-          const user = await signInOrCreateUser(parsed.data);
+          const user = await verifyCredentials(parsed.data);
 
           return {
             id: user.id,

@@ -212,6 +212,22 @@ describe("POST /api/chat/stream authorization", () => {
     expect(mocks.getConversation).not.toHaveBeenCalled();
   });
 
+  it("returns 400 for invalid interaction mode before conversation lookup", async () => {
+    const response = await POST(
+      chatRequest({
+        conversationId: CONVERSATION_ID,
+        message: "Hello",
+        interactionMode: "video",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(responseJson(response)).resolves.toEqual({
+      error: "interactionMode must be text or voice.",
+    });
+    expect(mocks.getConversation).not.toHaveBeenCalled();
+  });
+
   it("uses the authenticated user id and ignores client-supplied identity", async () => {
     mocks.auth.mockResolvedValueOnce({ user: { id: PEER_ID } });
     mocks.userFindUnique.mockResolvedValueOnce({
@@ -259,7 +275,7 @@ describe("POST /api/chat/stream authorization", () => {
     expect(mocks.createMessage).not.toHaveBeenCalled();
   });
 
-  it("streams a response for the owning user", async () => {
+  it("streams a response for the owning user through crisis support", async () => {
     const response = await POST(
       chatRequest({
         conversationId: CONVERSATION_ID,
@@ -292,10 +308,190 @@ describe("POST /api/chat/stream authorization", () => {
 
     const events = await readEvents(response);
     expect(events.map((event) => event.type)).toEqual([
+      "phase",
       "user-message",
       "assistant-delta",
       "assistant-message",
+      "done",
     ]);
+    expect(events[0]).toMatchObject({ phase: "streaming" });
+    expect(events.at(-1)).toMatchObject({ status: "completed" });
+  });
+
+  it("streams a progressive response through the genuine AI provider", async () => {
+    mocks.detectCrisisIntent.mockReturnValueOnce(false);
+
+    // Mock the async generator for streamGroundedAnswer
+    mocks.streamGroundedAnswer.mockImplementationOnce(async function* (
+      input: Record<string, unknown>,
+    ) {
+      // Ensure usageContext was passed correctly
+      expect(input.usageContext).toEqual({
+        userId: OWNER_ID,
+        workspaceId: "workspace-owner",
+        conversationId: CONVERSATION_ID,
+      });
+
+      yield { type: "delta", text: "Steady" };
+      yield { type: "delta", text: " yourself." };
+      yield {
+        type: "done",
+        answer: {
+          spokenAnswer: "Steady yourself.",
+          displayAnswer: "Steady yourself.",
+          citations: [],
+          grounding: { usedRag: false, confidence: 1 },
+        },
+      };
+    });
+
+    const response = await POST(
+      chatRequest({
+        conversationId: CONVERSATION_ID,
+        message: "What is duty?",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const events = await readEvents(response);
+
+    expect(mocks.retrieveScriptureContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "text",
+        personaId: "krishna",
+      }),
+    );
+    expect(events.map((event) => event.type)).toEqual([
+      "user-message",
+      "phase",
+      "phase",
+      "phase",
+      "assistant-delta",
+      "assistant-delta",
+      "assistant-message",
+      "done",
+    ]);
+    expect(events.filter((event) => event.type === "phase")).toEqual([
+      expect.objectContaining({ phase: "retrieving" }),
+      expect.objectContaining({ phase: "thinking" }),
+      expect.objectContaining({ phase: "streaming" }),
+    ]);
+    expect(events.at(-1)).toMatchObject({ status: "completed" });
+
+    // Check that createMessage was called to persist final answer
+    expect(mocks.createMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        role: "assistant",
+        content: "Steady yourself.",
+      }),
+    );
+  });
+
+  it("passes only bounded user-visible conversation history to generation", async () => {
+    mocks.detectCrisisIntent.mockReturnValueOnce(false);
+    const previousTurns = Array.from({ length: 14 }, (_, index) => ({
+      id: `previous-${index}`,
+      role: index % 2 === 0 ? "user" : "assistant",
+      content: `turn-${index}`,
+      createdAt: new Date(
+        `2026-06-14T00:00:${String(index).padStart(2, "0")}.000Z`,
+      ),
+    }));
+    mocks.listMessages.mockResolvedValueOnce([
+      {
+        id: "system-internal",
+        role: "system",
+        content: "internal prompt",
+        createdAt: new Date("2026-06-14T00:00:00.000Z"),
+      },
+      {
+        id: "tool-internal",
+        role: "tool",
+        content: "internal tool output",
+        createdAt: new Date("2026-06-14T00:00:00.000Z"),
+      },
+      ...previousTurns,
+    ]);
+    mocks.streamGroundedAnswer.mockImplementationOnce(async function* (
+      input: Record<string, unknown>,
+    ) {
+      expect(input.history).toEqual(
+        previousTurns.slice(2).map((message) => ({
+          role: message.role,
+          content: message.content,
+        })),
+      );
+      yield { type: "delta", text: "Follow the recent thread." };
+      yield {
+        type: "done",
+        answer: {
+          spokenAnswer: "Follow the recent thread.",
+          displayAnswer: "Follow the recent thread.",
+          citations: [],
+          grounding: { usedRag: false, confidence: 1 },
+        },
+      };
+    });
+
+    const response = await POST(
+      chatRequest({
+        conversationId: CONVERSATION_ID,
+        message: "Continue",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await readEvents(response);
+  });
+
+  it("passes voice interaction mode through to scripture retrieval and message metadata", async () => {
+    mocks.detectCrisisIntent.mockReturnValueOnce(false);
+    mocks.streamGroundedAnswer.mockImplementationOnce(async function* () {
+      yield { type: "delta", text: "Act with steadiness." };
+      yield {
+        type: "done",
+        answer: {
+          spokenAnswer: "Act with steadiness.",
+          displayAnswer: "Act with steadiness.",
+          citations: [],
+          grounding: { usedRag: false, confidence: 1 },
+          metadata: {
+            provider: "openai",
+            model: "gpt-test",
+          },
+        },
+      };
+    });
+
+    const response = await POST(
+      chatRequest({
+        conversationId: CONVERSATION_ID,
+        message: "What is duty?",
+        interactionMode: "voice",
+        turnId: "turn-voice",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await readEvents(response);
+
+    expect(mocks.retrieveScriptureContext).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: "voice",
+        traceId: expect.any(String),
+      }),
+    );
+    expect(mocks.createMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          interactionMode: "voice",
+          model: "gpt-test",
+          provider: "openai",
+          turnId: "turn-voice",
+          voiceEligible: true,
+        }),
+      }),
+    );
   });
 
   it("returns 429 before conversation lookup when rate limited", async () => {

@@ -4,11 +4,12 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
 import { env } from "@/env";
+import { db } from "@/lib/db";
 import { logObservabilityEvent } from "@/lib/observability";
-import { isPersonaId } from "@/lib/personas";
+import { getPersonaFromMetadata, isPersonaId } from "@/lib/personas";
 import { checkRateLimit, rateLimitResponseHeaders } from "@/lib/rate-limit";
 import { cleanTextForTTS, truncateForTTS } from "@/lib/tts-utils";
-import { getVoiceProfile } from "@/lib/voiceProfiles";
+import { getProviderVoiceProfile } from "@/lib/voiceProfiles.server";
 
 const ELEVENLABS_BASE = "https://api.elevenlabs.io/v1";
 const TTS_MIME_TYPE = "audio/mpeg";
@@ -16,10 +17,16 @@ const TTS_MIME_TYPE = "audio/mpeg";
 export const runtime = "nodejs";
 
 type TTSRequest = {
-  text?: string;
-  personaId?: string;
+  assistantMessageId?: string;
   traceId?: string;
+  turnId?: string;
 };
+
+function metadataRecord(metadata: unknown): Record<string, unknown> {
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? (metadata as Record<string, unknown>)
+    : {};
+}
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
@@ -46,17 +53,68 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => null)) as TTSRequest | null;
   const traceId = body?.traceId ?? crypto.randomUUID();
+  const turnId = body?.turnId;
+  const assistantMessageId = body?.assistantMessageId?.trim();
 
-  // ElevenLabs key check
+  if (!assistantMessageId) {
+    return NextResponse.json(
+      { error: "Missing assistantMessageId.", traceId },
+      { status: 400 },
+    );
+  }
+
+  const assistantMessage = await db.message.findFirst({
+    where: {
+      id: assistantMessageId,
+      role: "assistant",
+      conversation: {
+        userId: session.user.id,
+      },
+    },
+    include: {
+      conversation: true,
+    },
+  });
+
+  if (!assistantMessage) {
+    return NextResponse.json({ error: "Not found", traceId }, { status: 404 });
+  }
+
+  const metadata = metadataRecord(assistantMessage.metadata);
+  const personaFromMessage = metadata.personaId;
+  const personaId = isPersonaId(personaFromMessage)
+    ? personaFromMessage
+    : getPersonaFromMetadata(assistantMessage.conversation.metadata).id;
+  const voiceEligible = metadata.voiceEligible === true;
+  const spokenAnswer =
+    typeof metadata.spokenAnswer === "string" && metadata.spokenAnswer.trim()
+      ? metadata.spokenAnswer.trim()
+      : assistantMessage.content.trim();
+
+  if (!voiceEligible) {
+    return NextResponse.json(
+      { error: "This response is not approved for voice playback.", traceId },
+      { status: 400 },
+    );
+  }
+
+  // ElevenLabs key check happens after ownership/eligibility checks so missing
+  // provider config cannot be used to probe message IDs.
   if (!env.ELEVENLABS_API_KEY) {
     void logObservabilityEvent({
       traceId,
       eventType: "tts",
       status: "skipped",
       userId: session.user.id,
+      conversationId: assistantMessage.conversationId,
+      messageId: assistantMessage.id,
+      personaId,
       model: "elevenlabs",
       latencyMs: Date.now() - startedAt,
-      payload: { error: "Voice output is not configured." },
+      payload: {
+        error: "Voice output is not configured.",
+        turnId,
+      },
     });
     return NextResponse.json(
       { error: "Voice output is not configured.", traceId },
@@ -64,22 +122,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const rawText = body?.text?.trim();
-  const personaId = body?.personaId;
-
-  if (!rawText) {
-    return NextResponse.json({ error: "Missing text field." }, { status: 400 });
-  }
-
-  if (!personaId || !isPersonaId(personaId)) {
-    return NextResponse.json(
-      { error: "Invalid or missing personaId." },
-      { status: 400 },
-    );
-  }
-
-  const profile = getVoiceProfile(personaId);
-  const cleaned = cleanTextForTTS(rawText);
+  const profile = getProviderVoiceProfile(personaId);
+  const cleaned = cleanTextForTTS(spokenAnswer);
   const truncated = truncateForTTS(cleaned, profile.maxTtsChars);
 
   if (!truncated) {
@@ -91,7 +135,7 @@ export async function POST(request: Request) {
 
   try {
     const elevenRes = await fetch(
-      `${ELEVENLABS_BASE}/text-to-speech/${profile.elevenLabsVoiceId}/stream`,
+      `${ELEVENLABS_BASE}/text-to-speech/${profile.providerVoiceId}/stream`,
       {
         method: "POST",
         headers: {
@@ -101,13 +145,8 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           text: truncated,
-          model_id: profile.elevenLabsModel,
-          voice_settings: {
-            stability: 0.55,
-            similarity_boost: 0.78,
-            style: 0.22,
-            use_speaker_boost: true,
-          },
+          model_id: profile.providerModel,
+          voice_settings: profile.providerSettings,
         }),
       },
     );
@@ -120,13 +159,16 @@ export async function POST(request: Request) {
         eventType: "tts",
         status: "error",
         userId: session.user.id,
+        conversationId: assistantMessage.conversationId,
+        messageId: assistantMessage.id,
         personaId,
-        model: profile.elevenLabsModel,
+        model: profile.providerModel,
         latencyMs: Date.now() - startedAt,
         payload: {
           provider: "elevenlabs",
           status: elevenRes.status,
           error: errorBody.slice(0, 1000),
+          turnId,
         },
       });
       return NextResponse.json(
@@ -143,13 +185,16 @@ export async function POST(request: Request) {
       eventType: "tts",
       status: "success",
       userId: session.user.id,
+      conversationId: assistantMessage.conversationId,
+      messageId: assistantMessage.id,
       personaId,
-      model: profile.elevenLabsModel,
+      model: profile.providerModel,
       latencyMs: Date.now() - startedAt,
       payload: {
         provider: "elevenlabs",
         audioBytes: audioBuffer.byteLength,
         inputChars: truncated.length,
+        turnId,
       },
     });
 
@@ -172,10 +217,13 @@ export async function POST(request: Request) {
       eventType: "tts",
       status: "error",
       userId: session.user.id,
+      conversationId: assistantMessage.conversationId,
+      messageId: assistantMessage.id,
       personaId,
       latencyMs: Date.now() - startedAt,
       payload: {
         error: error instanceof Error ? error.message : String(error),
+        turnId,
       },
     });
     return NextResponse.json(

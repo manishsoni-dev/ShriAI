@@ -2,16 +2,51 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const OM_AUDIO_PATH = "/audio/om.mp3";
-const ENABLED_KEY = "shri-ai:om-enabled";
-const VOLUME_KEY = "shri-ai:om-volume";
+import {
+  getAudioContextConstructor,
+  getBrowserCapabilities,
+} from "@/lib/browser-capabilities";
+
+export const OM_ENABLED_KEY = "shri-ai:om-enabled";
+export const OM_VOLUME_KEY = "shri-ai:om-volume";
+
 const DEFAULT_VOLUME = 0.15;
-const isDev = process.env.NODE_ENV === "development";
+const MAX_VOLUME = 0.42;
+const DUCKED_VOLUME_RATIO = 0.22;
+const FADE_MS = 420;
+const OM_BASE_FREQUENCY = 136.1;
+
+type AmbientOmStatus = "paused" | "ready" | "playing" | "unavailable";
+
+type OmNodes = {
+  context: AudioContext;
+  gain: GainNode;
+  highGain: GainNode;
+  highTone: OscillatorNode;
+  lowGain: GainNode;
+  lowTone: OscillatorNode;
+};
+
+export function clampOmVolume(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_VOLUME;
+  return Math.min(MAX_VOLUME, Math.max(0, value));
+}
+
+export function getAmbientOmStatus(input: {
+  enabled: boolean;
+  isPlaying: boolean;
+  isSupported: boolean;
+}): AmbientOmStatus {
+  if (!input.isSupported) return "unavailable";
+  if (input.isPlaying) return "playing";
+  if (input.enabled) return "ready";
+  return "paused";
+}
 
 function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
-    const v = localStorage.getItem(key);
-    return v === null ? fallback : v === "true";
+    const value = window.localStorage.getItem(key);
+    return value === null ? fallback : value === "true";
   } catch {
     return fallback;
   }
@@ -19,121 +54,206 @@ function readStoredBoolean(key: string, fallback: boolean): boolean {
 
 function readStoredVolume(): number {
   try {
-    const v = Number(localStorage.getItem(VOLUME_KEY));
-    return Number.isFinite(v) ? Math.min(0.45, Math.max(0, v)) : DEFAULT_VOLUME;
+    return clampOmVolume(Number(window.localStorage.getItem(OM_VOLUME_KEY)));
   } catch {
     return DEFAULT_VOLUME;
   }
 }
 
-/**
- * AudioExperienceProvider — manages OM background audio using HTMLAudioElement.
- * Audio only starts after the first user interaction (browser autoplay policy).
- * Persists enabled/volume preference in localStorage.
- * Gracefully handles missing audio file.
- */
+function persistPreference(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Local storage can be unavailable in private or restricted contexts.
+  }
+}
+
+function createOmNodes(): OmNodes | null {
+  const AudioContextConstructor = getAudioContextConstructor();
+  if (!AudioContextConstructor) return null;
+
+  const context = new AudioContextConstructor();
+  const gain = context.createGain();
+  const lowGain = context.createGain();
+  const highGain = context.createGain();
+  const lowTone = context.createOscillator();
+  const highTone = context.createOscillator();
+
+  lowTone.type = "sine";
+  highTone.type = "triangle";
+  lowTone.frequency.value = OM_BASE_FREQUENCY;
+  highTone.frequency.value = OM_BASE_FREQUENCY * 1.5;
+
+  lowGain.gain.value = 0.72;
+  highGain.gain.value = 0.1;
+  gain.gain.value = 0;
+
+  lowTone.connect(lowGain);
+  highTone.connect(highGain);
+  lowGain.connect(gain);
+  highGain.connect(gain);
+  gain.connect(context.destination);
+
+  lowTone.start();
+  highTone.start();
+
+  return {
+    context,
+    gain,
+    highGain,
+    highTone,
+    lowGain,
+    lowTone,
+  };
+}
+
+function stopNodes(nodes: OmNodes | null) {
+  if (!nodes) return;
+
+  try {
+    nodes.lowTone.stop();
+  } catch {
+    // Already stopped.
+  }
+
+  try {
+    nodes.highTone.stop();
+  } catch {
+    // Already stopped.
+  }
+
+  void nodes.context.close().catch(() => undefined);
+}
+
+function rampGain(nodes: OmNodes, targetVolume: number) {
+  const now = nodes.context.currentTime;
+  nodes.gain.gain.cancelScheduledValues(now);
+  nodes.gain.gain.setTargetAtTime(targetVolume, now, FADE_MS / 1000 / 4);
+}
+
 export function AudioExperienceProvider() {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const capabilities = getBrowserCapabilities();
+  const isSupported = capabilities.webAudio;
+
+  const nodesRef = useRef<OmNodes | null>(null);
+  const stopTimerRef = useRef<number | null>(null);
+  const pendingPlayRef = useRef(false);
+  const duckingReasonsRef = useRef(new Set<string>());
+
   const [isClient, setIsClient] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(DEFAULT_VOLUME);
-  const [fileError, setFileError] = useState(false);
-  // Whether we're waiting for a gesture to resume audio (enabled but blocked)
-  const pendingPlayRef = useRef(false);
 
-  // ── Initialize audio element once on mount ─────────────────────────────────
-  useEffect(() => {
-    const audio = new Audio();
-    audio.loop = true;
-    audio.volume = DEFAULT_VOLUME;
-    audio.preload = "none";
+  const getEffectiveVolume = useCallback(
+    () =>
+      duckingReasonsRef.current.size > 0
+        ? volume * DUCKED_VOLUME_RATIO
+        : volume,
+    [volume],
+  );
 
-    audio.onended = () => setIsPlaying(false);
-    audio.onerror = () => {
-      if (isDev) {
-        console.warn(
-          "[AudioExperienceProvider] OM audio not found at",
-          OM_AUDIO_PATH,
-          "— place public/audio/om.mp3 to enable OM sound.",
-        );
+  const clearStopTimer = useCallback(() => {
+    if (stopTimerRef.current !== null) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+  }, []);
+
+  const ensureNodes = useCallback(() => {
+    if (nodesRef.current) return nodesRef.current;
+    const nodes = createOmNodes();
+    nodesRef.current = nodes;
+    return nodes;
+  }, []);
+
+  const stopAudio = useCallback(
+    (immediate = false) => {
+      pendingPlayRef.current = false;
+      const nodes = nodesRef.current;
+      if (!nodes) {
+        setIsPlaying(false);
+        return;
       }
-      setFileError(true);
+
+      clearStopTimer();
+      rampGain(nodes, 0);
       setIsPlaying(false);
-    };
 
-    audio.src = OM_AUDIO_PATH;
-    audioRef.current = audio;
-
-    // Hydrate preferences (scheduled to avoid synchronous setState-in-effect)
-    const timer = window.setTimeout(() => {
-      const storedEnabled = readStoredBoolean(ENABLED_KEY, false);
-      const storedVolume = readStoredVolume();
-      audio.volume = storedVolume;
-      setVolume(storedVolume);
-      setEnabled(storedEnabled);
-      // Mark as pending so first gesture triggers play if enabled
-      if (storedEnabled) {
-        pendingPlayRef.current = true;
+      if (immediate) {
+        stopNodes(nodes);
+        nodesRef.current = null;
+        return;
       }
+
+      stopTimerRef.current = window.setTimeout(() => {
+        stopNodes(nodesRef.current);
+        nodesRef.current = null;
+        stopTimerRef.current = null;
+      }, FADE_MS + 80);
+    },
+    [clearStopTimer],
+  );
+
+  const playAudio = useCallback(async () => {
+    if (!isSupported) return false;
+
+    const nodes = ensureNodes();
+    if (!nodes) return false;
+
+    clearStopTimer();
+
+    try {
+      if (nodes.context.state === "suspended") {
+        await nodes.context.resume();
+      }
+      rampGain(nodes, getEffectiveVolume());
+      pendingPlayRef.current = false;
+      setIsPlaying(true);
+      return true;
+    } catch (error) {
+      pendingPlayRef.current = true;
+      console.warn("[AudioExperienceProvider] OM playback is pending:", error);
+      setIsPlaying(false);
+      return false;
+    }
+  }, [clearStopTimer, ensureNodes, getEffectiveVolume, isSupported]);
+
+  const applyDucking = useCallback(() => {
+    const nodes = nodesRef.current;
+    if (!nodes || !isPlaying) return;
+    rampGain(nodes, getEffectiveVolume());
+  }, [getEffectiveVolume, isPlaying]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setVolume(readStoredVolume());
+      const storedEnabled = readStoredBoolean(OM_ENABLED_KEY, false);
+      setEnabled(storedEnabled);
+      pendingPlayRef.current = storedEnabled;
       setIsClient(true);
     }, 0);
 
     return () => {
       window.clearTimeout(timer);
-      audio.pause();
-      audio.src = "";
-      audioRef.current = null;
+      clearStopTimer();
+      stopAudio(true);
     };
-  }, []);
+  }, [clearStopTimer, stopAudio]);
 
-  // ── Persist preferences ────────────────────────────────────────────────────
   useEffect(() => {
     if (!isClient) return;
-    try {
-      localStorage.setItem(ENABLED_KEY, String(enabled));
-    } catch {
-      // ignore
-    }
+    persistPreference(OM_ENABLED_KEY, String(enabled));
   }, [enabled, isClient]);
 
   useEffect(() => {
     if (!isClient) return;
-    try {
-      localStorage.setItem(VOLUME_KEY, String(volume));
-    } catch {
-      // ignore
-    }
-    if (audioRef.current) {
-      audioRef.current.volume = volume;
-    }
-  }, [volume, isClient]);
+    persistPreference(OM_VOLUME_KEY, String(volume));
+    applyDucking();
+  }, [applyDucking, isClient, volume]);
 
-  // ── Audio control ──────────────────────────────────────────────────────────
-  const playAudio = useCallback(async () => {
-    const audio = audioRef.current;
-    if (!audio || fileError) return;
-
-    try {
-      audio.volume = volume;
-      await audio.play();
-      setIsPlaying(true);
-      pendingPlayRef.current = false;
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
-      if (isDev) console.warn("[AudioExperienceProvider] play() failed:", err);
-      // Autoplay blocked — stays pending for next gesture
-    }
-  }, [fileError, volume]);
-
-  const pauseAudio = useCallback(() => {
-    audioRef.current?.pause();
-    setIsPlaying(false);
-  }, []);
-
-  // ── First-gesture listener (fires once when enabled + pending) ─────────────
   useEffect(() => {
-    if (!isClient || !enabled || fileError || isPlaying) return;
+    if (!isClient || !enabled || !isSupported || isPlaying) return;
 
     const handleGesture = () => {
       if (pendingPlayRef.current) {
@@ -156,62 +276,68 @@ export function AudioExperienceProvider() {
       });
       window.removeEventListener("keydown", handleGesture, { capture: true });
     };
-  }, [isClient, enabled, fileError, isPlaying, playAudio]);
+  }, [enabled, isClient, isPlaying, isSupported, playAudio]);
 
-  // ── Auto-pause when disabled ───────────────────────────────────────────────
   useEffect(() => {
     if (!isClient) return;
-    if (!enabled && isPlaying) {
-      const timer = window.setTimeout(() => pauseAudio(), 0);
-      return () => window.clearTimeout(timer);
+    const duckingReasons = duckingReasonsRef.current;
+
+    function duck(reason: string) {
+      duckingReasons.add(reason);
+      applyDucking();
     }
-  }, [isClient, enabled, isPlaying, pauseAudio]);
 
-  // ── Audio Ducking (TTS active) ──────────────────────────────────────────────
-  useEffect(() => {
-    if (!isClient) return;
-    const handleTTSStart = () => {
-      if (audioRef.current) {
-        audioRef.current.volume = volume * 0.2;
-      }
-    };
-    const handleTTSEnd = () => {
-      if (audioRef.current) {
-        audioRef.current.volume = volume;
-      }
-    };
-    window.addEventListener("shri-ai:tts-start", handleTTSStart);
-    window.addEventListener("shri-ai:tts-end", handleTTSEnd);
+    function unduck(reason: string) {
+      duckingReasons.delete(reason);
+      applyDucking();
+    }
+
+    const handleTtsStart = () => duck("tts");
+    const handleTtsEnd = () => unduck("tts");
+    const handleVoiceStart = () => duck("voice");
+    const handleVoiceEnd = () => unduck("voice");
+
+    window.addEventListener("shri-ai:tts-start", handleTtsStart);
+    window.addEventListener("shri-ai:tts-end", handleTtsEnd);
+    window.addEventListener("shri-ai:voice-start", handleVoiceStart);
+    window.addEventListener("shri-ai:voice-end", handleVoiceEnd);
+
     return () => {
-      window.removeEventListener("shri-ai:tts-start", handleTTSStart);
-      window.removeEventListener("shri-ai:tts-end", handleTTSEnd);
-      // Ensure volume is restored on unmount
-      if (audioRef.current) {
-        audioRef.current.volume = volume;
-      }
+      window.removeEventListener("shri-ai:tts-start", handleTtsStart);
+      window.removeEventListener("shri-ai:tts-end", handleTtsEnd);
+      window.removeEventListener("shri-ai:voice-start", handleVoiceStart);
+      window.removeEventListener("shri-ai:voice-end", handleVoiceEnd);
+      duckingReasons.clear();
+      applyDucking();
     };
-  }, [isClient, volume]);
+  }, [applyDucking, isClient]);
 
-  // ── User toggle ────────────────────────────────────────────────────────────
   async function handleToggle() {
-    if (fileError) return;
+    if (!isSupported) return;
 
-    if (enabled || isPlaying) {
+    if (isPlaying) {
       setEnabled(false);
-      pendingPlayRef.current = false;
-      pauseAudio();
-    } else {
-      setEnabled(true);
-      pendingPlayRef.current = true;
-      await playAudio().catch(() => {
-        // Autoplay blocked — pendingPlayRef will trigger on next gesture
-      });
+      stopAudio();
+      return;
     }
+
+    setEnabled(true);
+    pendingPlayRef.current = true;
+    await playAudio();
   }
 
   if (!isClient) return null;
 
-  const isActive = isPlaying;
+  const status = getAmbientOmStatus({ enabled, isPlaying, isSupported });
+  const disabled = status === "unavailable";
+  const statusLabel =
+    status === "playing"
+      ? "Playing"
+      : status === "ready"
+        ? "Ready"
+        : status === "unavailable"
+          ? "Unavailable"
+          : "Paused";
 
   return (
     <div
@@ -220,34 +346,36 @@ export function AudioExperienceProvider() {
       role="group"
     >
       <button
-        aria-label={isActive ? "Pause OM sound" : "Play OM sound"}
-        aria-pressed={isActive}
+        aria-label={isPlaying ? "Pause OM sound" : "Play OM sound"}
+        aria-pressed={isPlaying}
         className={`grid min-h-10 min-w-12 place-items-center rounded-md border px-3 text-xs font-semibold transition ${
-          isActive
+          isPlaying
             ? "border-amber-300/45 bg-amber-300/14 text-amber-100 shadow-[0_0_26px_rgba(245,158,11,0.22)]"
             : "border-amber-200/14 bg-white/[0.04] text-amber-100/72 hover:border-amber-200/32"
         } disabled:cursor-not-allowed disabled:opacity-45`}
-        disabled={fileError}
+        disabled={disabled}
         onClick={() => void handleToggle()}
         title={
-          fileError
-            ? "OM audio file not found — place public/audio/om.mp3"
-            : isActive
+          disabled
+            ? "Ambient OM sound is unavailable in this browser"
+            : isPlaying
               ? "Pause OM sound"
               : "Enable OM ambient sound"
         }
         type="button"
       >
-        {isActive ? "OM" : "Enable Sound"}
+        {status === "playing" ? "OM" : statusLabel}
       </button>
 
       <input
         aria-label="OM volume"
         className="h-24 w-2 accent-amber-300"
-        disabled={fileError}
-        max="0.45"
+        disabled={disabled}
+        max={MAX_VOLUME}
         min="0"
-        onChange={(e) => setVolume(Number(e.target.value))}
+        onChange={(event) =>
+          setVolume(clampOmVolume(Number(event.target.value)))
+        }
         step="0.01"
         style={{
           direction: "rtl",

@@ -1,0 +1,268 @@
+{
+  "version": "v1",
+  "hash": "172ea9ae0bfd4619",
+  "creationDate": "2026-06-15T09:33:59.978Z",
+  "author": "Shri AI Assessment System",
+  "purpose": "Retrieval Development",
+  "allowedUse": "evaluation-only",
+  "cases": [
+    {
+      "id": "gita-eval-001",
+      "question": "How should I deal with fear of failure?",
+      "personaId": "krishna",
+      "themes": [
+        "courage",
+        "duty"
+      ],
+      "expectedRefs": [
+        "2.3",
+        "2.40",
+        "2.47"
+      ],
+      "acceptableChapters": [
+        2
+      ]
+    },
+    {
+      "id": "gita-eval-002",
+      "question": "Should I act when I am unsure of the result?",
+      "personaId": "krishna",
+      "themes": [
+        "karma",
+        "duty"
+      ],
+      "expectedRefs": [
+        "2.47",
+        "2.48",
+        "3.19"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-003",
+      "question": "How do I control anger?",
+      "personaId": "krishna",
+      "themes": [
+        "self-mastery"
+      ],
+      "expectedRefs": [
+        "2.62",
+        "2.63",
+        "3.37"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-004",
+      "question": "What is my duty?",
+      "personaId": "krishna",
+      "themes": [
+        "duty"
+      ],
+      "expectedRefs": [
+        "2.31",
+        "2.33",
+        "3.35"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-005",
+      "question": "How can I become less attached?",
+      "personaId": "krishna",
+      "themes": [
+        "detachment"
+      ],
+      "expectedRefs": [
+        "2.48",
+        "2.71",
+        "3.19"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-006",
+      "question": "What should I remember when grief overwhelms me?",
+      "personaId": "krishna",
+      "themes": [
+        "grief",
+        "wisdom"
+      ],
+      "expectedRefs": [
+        "2.11",
+        "2.13",
+        "2.30"
+      ],
+      "acceptableChapters": [
+        2
+      ]
+    },
+    {
+      "id": "gita-eval-007",
+      "question": "How do I stay steady in pleasure and pain?",
+      "personaId": "krishna",
+      "themes": [
+        "steadiness"
+      ],
+      "expectedRefs": [
+        "2.14",
+        "2.15",
+        "2.38"
+      ],
+      "acceptableChapters": [
+        2
+      ]
+    },
+    {
+      "id": "gita-eval-008",
+      "question": "How should I handle desire?",
+      "personaId": "krishna",
+      "themes": [
+        "detachment"
+      ],
+      "expectedRefs": [
+        "2.62",
+        "2.70",
+        "3.37"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-009",
+      "question": "How do I know a person of steady wisdom?",
+      "personaId": "krishna",
+      "themes": [
+        "wisdom",
+        "steadiness"
+      ],
+      "expectedRefs": [
+        "2.55",
+        "2.56",
+        "2.57"
+      ],
+      "acceptableChapters": [
+        2
+      ]
+    },
+    {
+      "id": "gita-eval-010",
+      "question": "How can I work without anxiety over outcomes?",
+      "personaId": "krishna",
+      "themes": [
+        "karma",
+        "detachment"
+      ],
+      "expectedRefs": [
+        "2.47",
+        "2.48",
+        "3.19"
+      ],
+      "acceptableChapters": [
+        2,
+        3
+      ]
+    },
+    {
+      "id": "gita-eval-011",
+      "question": "What is the danger of chasing sense objects?",
+      "personaId": "krishna",
+      "themes": [
+        "self-mastery"
+      ],
+      "expectedRefs": [
+        "2.62",
+        "2.63",
+        "2.67"
+      ],
+      "acceptableChapters": [
+        2
+      ]
+    },
+    {
+      "id": "gita-eval-012",
+      "question": "How do I steady my mind during meditation?",
+      "personaId": "krishna",
+      "themes": [
+        "meditation"
+      ],
+      "expectedRefs": [
+        "6.10",
+        "6.11",
+        "6.26"
+      ],
+      "acceptableChapters": [
+        6
+      ]
+    },
+    {
+      "id": "gita-eval-013",
+      "question": "What is moderation in spiritual practice?",
+      "personaId": "krishna",
+      "themes": [
+        "discipline"
+      ],
+      "expectedRefs": [
+        "6.16",
+        "6.17",
+        "6.18"
+      ],
+      "acceptableChapters": [
+        6
+      ]
+    },
+    {
+      "id": "gita-eval-014",
+      "question": "How should I lift myself when I feel low?",
+      "personaId": "krishna",
+      "themes": [
+        "self-mastery"
+      ],
+      "expectedRefs": [
+        "6.5",
+        "6.6"
+      ],
+      "acceptableChapters": [
+        6
+      ]
+    },
+    {
+      "id": "gita-eval-015",
+      "question": "Why is disciplined action better than inaction?",
+      "personaId": "krishna",
+      "themes": [
+        "karma"
+      ],
+      "expectedRefs": [
+        "3.4",
+        "3.5",
+        "3.8"
+      ],
+      "acceptableChapters": [
+        3
+      ]
+    },
+    {
+      "id": "isha-001",
+      "question": "What does Isha Upanishad say about renunciation and wealth?",
+      "personaId": "krishna",
+      "expectedRefs": [
+        "1"
+      ]
+    }
+  ]
+}

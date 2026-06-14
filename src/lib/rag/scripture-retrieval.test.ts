@@ -390,7 +390,7 @@ describe("retrieveScriptureContext — voice-mode security", () => {
     vi.clearAllMocks();
   });
 
-  it("text mode does NOT inject the ScriptureChunkReview approval JOIN", async () => {
+  it("text mode requires approved active legal text without the voice-only approval filter", async () => {
     (db.$queryRaw as Mock)
       .mockResolvedValueOnce([
         mockGitaChunk,
@@ -409,9 +409,12 @@ describe("retrieveScriptureContext — voice-mode security", () => {
       .map((call) => Array.from(call[0] as TemplateStringsArray).join(""))
       .join("\n");
 
-    // Text mode SQL must NOT contain the voice-approval filter
+    // Text mode must be reviewed/legal/active but must not require voice approval.
+    expect(vectorSql).toContain('"ScriptureChunkReview"');
+    expect(vectorSql).toContain("\"reviewStatus\" = 'approved'");
+    expect(vectorSql).toContain('"active" = true');
+    expect(vectorSql).toContain('"copyrightStatus" = ANY');
     expect(vectorSql).not.toContain('"approvedForVoice" = true');
-    expect(vectorSql).not.toContain("ScriptureChunkReview");
   });
 
   it("voice mode returns insufficientApprovedContext=true when there are zero approved-for-voice chunks", async () => {

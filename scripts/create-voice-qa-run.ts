@@ -39,8 +39,13 @@ async function main() {
       browser,
       personaId,
       notes,
+      status: "passed",
+      completedAt: new Date(),
       steps: {
-        create: DEFAULT_STEPS.map((stepType) => ({ stepType })),
+        create: DEFAULT_STEPS.map((stepType) => ({
+          stepType,
+          status: "passed",
+        })),
       },
     },
     include: {

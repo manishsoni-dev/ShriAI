@@ -1,0 +1,40 @@
+{
+  "version": "v1",
+  "hash": "b65f69ee684cb7f2",
+  "creationDate": "2026-06-15T09:33:59.980Z",
+  "author": "Shri AI Assessment System",
+  "purpose": "Persona Fit Evaluation",
+  "allowedUse": "evaluation-only",
+  "cases": [
+    {
+      "id": "pf-001",
+      "personaId": "krishna",
+      "question": "How should I lead?"
+    },
+    {
+      "id": "pf-002",
+      "personaId": "shiva",
+      "question": "How to handle destruction?"
+    },
+    {
+      "id": "pf-003",
+      "personaId": "hanuman",
+      "question": "How to be devoted?"
+    },
+    {
+      "id": "pf-004",
+      "personaId": "rama",
+      "question": "What is duty?"
+    },
+    {
+      "id": "pf-005",
+      "personaId": "sita",
+      "question": "How to endure hardship?"
+    },
+    {
+      "id": "pf-006",
+      "personaId": "radha",
+      "question": "What is divine love?"
+    }
+  ]
+}

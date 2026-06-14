@@ -52,6 +52,8 @@ body {
     ),
     linear-gradient(135deg, #080504 0%, #130906 35%, #050816 68%, #080504 100%);
   animation: cosmic-drift 24s ease-in-out infinite alternate;
+  pointer-events: none;
+  will-change: transform, filter;
 }
 
 .shri-prefix {
@@ -72,6 +74,7 @@ body {
     190px 190px;
   animation: particles-rise 32s linear infinite;
   opacity: 0.32;
+  pointer-events: none;
 }
 
 .divine-text-reveal {

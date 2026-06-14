@@ -2,10 +2,10 @@
 import "dotenv/config";
 
 import * as fs from "node:fs";
+import Module from "node:module";
 import * as path from "node:path";
 
 import { db } from "../src/lib/db";
-import { retrieveScriptureContext } from "../src/lib/rag/scripture-retrieval";
 
 type Gate = {
   name: string;
@@ -41,6 +41,24 @@ const minVoiceApprovedPercent = Number(
 );
 const requireCompletedVoiceQa =
   (process.env.RELEASE_REQUIRE_COMPLETED_VOICE_QA ?? "true") !== "false";
+
+function installServerOnlyShimForCli() {
+  const moduleWithLoad = Module as unknown as {
+    _load: (
+      request: string,
+      parent: NodeModule | null | undefined,
+      isMain: boolean,
+    ) => unknown;
+  };
+  const originalLoad = moduleWithLoad._load;
+
+  moduleWithLoad._load = function patchedLoad(request, parent, isMain) {
+    if (request === "server-only") return {};
+    return originalLoad.call(this, request, parent, isMain);
+  };
+}
+
+installServerOnlyShimForCli();
 
 function configured(value: string | undefined) {
   return Boolean(value && value.trim() && !value.includes("replace-with"));
@@ -171,6 +189,7 @@ async function main() {
     db.scriptureChunkReview.count({
       where: {
         reviewStatus: "approved",
+        reviewOrigin: "human",
         approvedForVoice: true,
         chunk: {
           source: {
@@ -225,6 +244,8 @@ async function main() {
     );
   }
 
+  const { retrieveScriptureContext } =
+    await import("../src/lib/rag/scripture-retrieval");
   const voiceRetrieval = await retrieveScriptureContext({
     query: "karma duty action",
     personaId: "krishna",
@@ -242,6 +263,7 @@ async function main() {
               reviews: {
                 some: {
                   reviewStatus: "approved",
+                  reviewOrigin: "human",
                   approvedForVoice: true,
                 },
               },
@@ -267,6 +289,8 @@ async function main() {
       where: {
         status: "passed",
         completedAt: { not: null },
+        device: { not: null },
+        browser: { not: null },
         OR: [
           { label: { contains: releaseEnvironment, mode: "insensitive" } },
           { notes: { contains: releaseEnvironment, mode: "insensitive" } },

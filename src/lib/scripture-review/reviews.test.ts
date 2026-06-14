@@ -270,6 +270,7 @@ describe("mutateScriptureReview", () => {
           reviewStatus: "approved",
           approvedForVoice: true,
           reviewedBy: "reviewer-user",
+          reviewOrigin: "human",
         }),
       }),
     );

@@ -15,6 +15,7 @@ model User {
   workspaceMember   WorkspaceMember[]
   conversations     Conversation[]
   usageEvents       UsageEvent[]
+  feedbacks         UserFeedback[]
   uploadedDocuments Document[]        @relation("DocumentUploadedBy")
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
@@ -63,6 +64,7 @@ model Conversation {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages    Message[]
   usageEvents UsageEvent[]
+  feedbacks   UserFeedback[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -73,14 +75,16 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(cuid())
+  id             String           @id @default(cuid())
   role           MessageRole
   content        String
   metadata       Json?
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  citations      AnswerCitation[]
+  feedbacks      UserFeedback[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([conversationId])
   @@index([createdAt])
@@ -152,6 +156,7 @@ enum VoiceQaRunStatus {
   passed
   failed
   partial
+  invalid
 }
 
 enum VoiceQaStepStatus {
@@ -169,11 +174,12 @@ model VoiceQaRun {
   personaId   String?
   status      VoiceQaRunStatus @default(pending)
   notes       String?
-  startedAt   DateTime         @default(now())
-  completedAt DateTime?
-  steps       VoiceQaStep[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  startedAt     DateTime         @default(now())
+  completedAt   DateTime?
+  invalidatedAt DateTime?
+  steps         VoiceQaStep[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   @@index([status])
   @@index([personaId])
@@ -337,23 +343,26 @@ enum ScriptureReviewStatus {
   approved
   rejected
   needs_changes
+  needs_revision
 }
 
 /// Human theological/source review for a scripture chunk before broad voice use.
 model ScriptureChunkReview {
-  id                  String                @id @default(cuid())
-  chunkId             String                @unique
-  reviewStatus        ScriptureReviewStatus @default(pending)
+  id                  String                      @id @default(cuid())
+  chunkId             String                      @unique
+  reviewStatus        ScriptureReviewStatus       @default(pending)
+  reviewOrigin        String                      @default("human")
   reviewedBy          String?
   reviewedAt          DateTime?
+  invalidatedAt       DateTime?
   accuracyScore       Int?
   interpretationNotes String?
   rejectionReason     String?
-  approvedForVoice    Boolean               @default(false)
-  chunk               ScriptureChunk        @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  approvedForVoice    Boolean                     @default(false)
+  chunk               ScriptureChunk              @relation(fields: [chunkId], references: [id], onDelete: Cascade)
   audits              ScriptureChunkReviewAudit[]
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
 
   @@index([reviewStatus])
   @@index([approvedForVoice])
@@ -362,18 +371,18 @@ model ScriptureChunkReview {
 
 /// Immutable audit trail for scripture chunk review decisions.
 model ScriptureChunkReviewAudit {
-  id                         String                 @id @default(cuid())
-  reviewId                   String
-  scriptureChunkId           String
-  previousStatus             ScriptureReviewStatus?
-  nextStatus                 ScriptureReviewStatus
-  previousApprovedForVoice   Boolean?
-  nextApprovedForVoice       Boolean
-  reviewerUserId             String
-  notes                      String?
-  review                     ScriptureChunkReview   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  scriptureChunk             ScriptureChunk         @relation(fields: [scriptureChunkId], references: [id], onDelete: Cascade)
-  createdAt                  DateTime               @default(now())
+  id                       String                 @id @default(cuid())
+  reviewId                 String
+  scriptureChunkId         String
+  previousStatus           ScriptureReviewStatus?
+  nextStatus               ScriptureReviewStatus
+  previousApprovedForVoice Boolean?
+  nextApprovedForVoice     Boolean
+  reviewerUserId           String
+  notes                    String?
+  review                   ScriptureChunkReview   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  scriptureChunk           ScriptureChunk         @relation(fields: [scriptureChunkId], references: [id], onDelete: Cascade)
+  createdAt                DateTime               @default(now())
 
   @@index([reviewId])
   @@index([scriptureChunkId])
@@ -404,8 +413,48 @@ model AnswerCitation {
   chunkId   String
   score     Float?
   chunk     ScriptureChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  message   Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
   createdAt DateTime       @default(now())
 
   @@index([messageId])
   @@index([chunkId])
 }
+
+enum FeedbackLabel {
+  helpful
+  not_helpful
+  irrelevant_retrieval
+  incorrect_citation
+  persona_mismatch
+  too_long
+  too_short
+  unsafe
+  incomplete
+  voice_problem
+}
+
+/// Privacy-safe user feedback on model responses.
+model UserFeedback {
+  id                      String        @id @default(cuid())
+  userId                  String
+  conversationId          String
+  messageId               String
+  personaId               String?
+  traceId                 String?
+  modelConfiguration      String?
+  retrievalConfiguration  String?
+  labels                  FeedbackLabel[]
+  notes                   String?       // optional free-text
+
+  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation            Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message                 Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  createdAt               DateTime      @default(now())
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([messageId])
+  @@index([createdAt])
+}
+
