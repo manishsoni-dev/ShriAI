@@ -4,6 +4,11 @@ import { db } from "@/lib/db";
 
 type Metadata = Prisma.InputJsonValue;
 
+/**
+ * Policy: Conversations are PRIVATE and owned by the user who created them.
+ * Workspace membership alone does NOT grant access to another user's conversation.
+ * Every read and write path must verify userId === conversation.userId.
+ */
 export class ConversationAccessError extends Error {
   constructor() {
     super("Conversation not found or access denied.");
@@ -38,6 +43,11 @@ async function assertWorkspaceAccess(input: {
   return membership;
 }
 
+/**
+ * Returns the conversation only if the authenticated user is its owner.
+ * Uses findUnique on (id, userId) so the query hits the primary key and the
+ * userId index in a single round-trip — no workspace join required.
+ */
 async function getAccessibleConversation(input: {
   userId: string;
   conversationId: string;
@@ -45,13 +55,7 @@ async function getAccessibleConversation(input: {
   const conversation = await db.conversation.findFirst({
     where: {
       id: input.conversationId,
-      workspace: {
-        members: {
-          some: {
-            userId: input.userId,
-          },
-        },
-      },
+      userId: input.userId,
     },
   });
 
@@ -90,6 +94,7 @@ export async function listConversations(input: {
   return db.conversation.findMany({
     where: {
       workspaceId: input.workspaceId,
+      userId: input.userId, // Private: only the owner's conversations
     },
     include: {
       messages: {
