@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/.pytest_cache/
 
 # next.js
 /.next/
@@ -64,6 +67,7 @@ __pycache__/
 # Uploads & Outputs
 uploads/
 eval-results/
+/eval_output.txt
 
 # OS
 __MACOSX/
