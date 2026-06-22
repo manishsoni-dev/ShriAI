@@ -16,7 +16,12 @@ Even though these files are correctly ignored by Git (`.gitignore`) and were nev
 Direct database schema changes without corresponding migrations can cause production failures.
 **Mitigation**: Always use `prisma migrate dev` to generate structured, version-controlled migrations for the database.
 
-### AI Provider Failures
+### Local AI Service Failures
 
-Rate limits, timeouts, or downtime from external AI providers (OpenAI, ElevenLabs, Deepgram) can block primary user workflows.
-**Mitigation**: Graceful degradation (e.g., fallback to text if voice synthesis fails) and structured error handling are necessary.
+Unavailable Ollama or faster-whisper processes can interrupt AI or
+voice features. Large or malformed audio can also consume local resources.
+
+**Mitigation**: Keep typed input available, use structured timeout/unavailable
+errors, require stored consent and a backend-only service token, bind model
+services to loopback, and enforce byte-size plus decoded-duration limits before
+inference. Hosted voice providers are not an emergency fallback.

@@ -10,10 +10,10 @@ Shri AI is a full-stack AI assistant foundation with authentication, workspace-a
 
 - Email/password authentication with protected routes
 - Workspace-backed users and conversations
-- OpenAI provider gateway with configurable models
+- Native local Ollama provider gateway with configurable models
 - Usage metadata capture for assistant responses
 - Document upload, text extraction, chunking, embeddings, and semantic search
-- Voice-first chat with browser mic recording, speech transcription, persona TTS, and typed fallback
+- Voice-first chat with browser mic recording, local transcription, browser speech, and typed fallback
 - User-controlled looping OM ambience with persisted volume
 - Prisma/PostgreSQL persistence with migration-based setup
 
@@ -55,7 +55,14 @@ openssl rand -base64 32
 
 4. Configure Postgres using the [Database Setup](#database-setup) section.
 
-5. Generate the Prisma client and apply migrations:
+5. Install Ollama and pull the local models:
+
+```bash
+ollama pull qwen3:8b
+ollama pull qwen3-embedding:0.6b
+```
+
+6. Generate the Prisma client and apply migrations:
 
 ```bash
 npm run prisma:generate
@@ -63,7 +70,7 @@ npm run db:check
 npm run prisma:migrate
 ```
 
-6. Start the development server:
+7. Start the development server:
 
 ```bash
 npm run dev
@@ -78,7 +85,8 @@ This project uses Prisma migrations as the source of truth. Do not use
 exist. `npm run prisma:push` is available only as a temporary local development
 fallback for throwaway databases.
 
-The current migration history includes a `DocumentChunk.embedding vector(1536)`
+The current migration history includes `DocumentChunk.embedding` and
+`ScriptureChunk.embedding` as `vector(1024)`
 column, so the target Postgres database must support the `pgvector` extension.
 
 ### Option A: Docker Compose
@@ -162,7 +170,9 @@ Exact terminal commands for a healthy local database are:
 
 ```bash
 cp .env.example .env.local
-# edit .env.local and set DATABASE_URL, AUTH_SECRET, and OPENAI_API_KEY
+# edit .env.local and set DATABASE_URL and AUTH_SECRET
+ollama pull qwen3:8b
+ollama pull qwen3-embedding:0.6b
 npm ci
 npm run prisma:generate
 npm run db:check
@@ -182,38 +192,33 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?schema=public" npm r
 ## Voice Setup
 
 The `/chat` route is voice-first, but typed text remains available as a fallback.
-Voice input and output use server routes so API keys are never exposed to the
-browser.
+Voice input and output use authenticated server routes. No AI service URL or
+model endpoint is exposed to browser code.
 
-Speech-to-text is configured with:
+Speech-to-text uses the repository-owned faster-whisper service. Generate one
+private token and use the same value for Next.js and Docker:
 
-```env
-STT_PROVIDER="openai"
-OPENAI_API_KEY=""
-DEEPGRAM_API_KEY=""
-GOOGLE_API_KEY=""
+```bash
+export STT_SERVICE_TOKEN="$(openssl rand -hex 32)"
+docker compose up --build voice
 ```
 
-`STT_PROVIDER` can be `openai`, `deepgram`, or `google`. OpenAI transcription
-uses `OPENAI_API_KEY`; Deepgram uses `DEEPGRAM_API_KEY`; Google Speech-to-Text
-uses `GOOGLE_API_KEY`. If the selected provider key is missing, the app returns
-a safe voice-transcription error and users can still type into chat.
+The container binds `127.0.0.1:8001`, stores downloaded model files in the
+`voice-models` volume, and accepts only authenticated backend requests. The
+backend validates stored microphone consent before forwarding an upload. The
+service independently enforces supported media, a 10 MB size limit, and a
+90-second decoded-duration limit. See `services/voice/README.md` for native
+Python and model configuration commands.
 
-Persona voice output is configured with:
-
-```env
-ELEVENLABS_API_KEY=""
-```
-
-When `ELEVENLABS_API_KEY` is present, `/api/voice/tts` returns base64 MP3 audio
-for the selected natural devotional human voice profile. If it is missing or
-the browser blocks playback, the UI keeps the text answer visible and offers a
-browser speech or tap-to-play fallback where available.
+Voice output uses only the browser's installed `SpeechSynthesis` voices with
+persona rate/pitch guidance. If browser speech is unavailable or errors, the
+generated text remains visible. There are no server TTS, ElevenLabs, Deepgram,
+Google STT, OpenAI speech, or other hosted voice-provider runtime paths.
 
 Voice observability is trace based. Speech-to-text returns a `voiceTraceId`,
-chat forwards that trace through scripture retrieval, and text-to-speech logs
-against the same trace when available. Trace events are stored in
-`ObservabilityEvent` with event types `stt`, `retrieval`, `chat`, and `tts`.
+chat forwards that trace through scripture retrieval, and browser speech keeps
+the same turn boundary. Trace events are stored in `ObservabilityEvent` with
+event types `stt`, `retrieval`, and `chat`.
 
 ## OM Audio Setup
 
@@ -239,12 +244,12 @@ the control unavailable instead of crashing.
 - `npm run prisma:push` pushes the schema without migrations for throwaway development databases only.
 - `npm run prisma:studio` opens Prisma Studio.
 - `npm run scripture:build-corpus` regenerates the 300-record public-domain Bhagavad Gita v1 corpus from Wikisource.
-- `npm run scripture:validate` validates corpus shape, source/license metadata, and duplicate references.
+- `npm run scripture:validate` validates verse-aware corpus shape, the authoritative source manifest, rights eligibility, and duplicate references.
 - `npm run scripture:ingest` idempotently upserts Bhagavad Gita records into Postgres.
 - `npm run scripture:embed` embeds missing Bhagavad Gita records and skips already embedded chunks.
 - `npm run scripture:prepare-reviews` idempotently creates missing pending review rows without resetting completed reviews.
-- `npm run scripture:eval` runs the 50-question retrieval evaluation with the hard accuracy gate.
-- `npm run release:check` verifies DB, migration, review, retrieval, environment, and Voice QA readiness gates.
+- `npm run scripture:eval` runs the canonical evidence-v2 evaluation with 50 grounded cases plus adversarial abstention, injection, and crisis cases.
+- `npm run release:check` verifies DB, migration, provenance, review, retrieval, fresh canonical evaluation, environment, and Voice QA readiness gates.
 - `npm run format` formats files with Prettier.
 - `npm run format:check` verifies formatting without changing files.
 
@@ -280,8 +285,8 @@ format:check -> lint -> typecheck -> test -> build -> db:ready
 ```
 
 CI uses placeholder non-secret values only where build-time validation requires
-environment variables. Provider keys are not configured in CI, and the workflow
-must not depend on live AI, STT, or TTS providers.
+environment variables. Unit tests mock localhost services, so CI does not need
+Ollama, Whisper, or API keys.
 
 ## Scripture RAG
 
@@ -290,6 +295,18 @@ The v1 Bhagavad Gita corpus lives at:
 ```text
 data/scriptures/bhagavad-gita/bhagavad-gita-besant-v1.json
 ```
+
+`data/scriptures/source-manifest.json` is the authority for edition,
+translator, language, rights, license, attribution, source URL, and ingestion
+date. Corpus JSON cannot make an unmanifested or restricted source eligible.
+Every persisted chunk stores explicit chapter and inclusive verse boundaries.
+
+Production text retrieval is hybrid PostgreSQL full-text plus local Ollama
+vector search and returns only active, legally eligible chunks with an approved
+review. Voice mode additionally requires `approvedForVoice=true`. When no
+approved passage meets the configured answer confidence threshold, generation
+abstains; limited evidence is labeled uncertain. Generated citations are
+validated against the exact retrieved chunk set before answer text is emitted.
 
 It is generated from the 1922 Annie Besant Wikisource edition, using
 Wikisource as the public-domain source text reference. SanskritDocuments is not
@@ -306,9 +323,11 @@ npm run scripture:embed
 npm run scripture:eval
 ```
 
-Do not describe scripture retrieval as accurate unless `npm run scripture:eval`
-passes. The hard gate is Recall@5 >= 0.80, MRR >= 0.60, correct source rate >=
-0.95, unsupported-answer rate <= 0.05, and p95 retrieval latency <= 2500ms.
+Do not describe scripture retrieval as reliable unless `npm run scripture:eval`
+passes against `data/evals/scripture-retrieval/evidence-v2.json`. Release also
+requires a passing artifact from that exact dataset and experiment config,
+with a matching SHA-256 fingerprint, at least 30 cases, and an age under seven
+days.
 
 ## Human Scripture Review
 
@@ -451,12 +470,25 @@ each other's conversations.
 Model access is isolated in `src/lib/ai`. UI components should never call provider SDKs directly.
 
 - `src/lib/ai/types.ts` defines the provider interface.
-- `src/lib/ai/openai-provider.ts` contains the OpenAI implementation.
+- `src/lib/ai/ollama-provider.ts` uses native server-side HTTP requests to
+  Ollama `/api/chat` and `/api/embed`.
 - `src/lib/ai/config.ts` centralizes model names from environment variables.
 - `src/lib/ai/errors.ts` exposes typed, readable errors.
 - `src/lib/ai/README.md` explains how to add another provider.
 
-The chat server action calls the gateway and persists assistant responses with provider, model, request, and usage metadata.
+The chat server action calls the gateway and persists assistant responses with
+provider, model, request, and usage metadata. The default local configuration
+is:
+
+```env
+OLLAMA_BASE_URL="http://127.0.0.1:11434"
+SHRI_AI_CHAT_MODEL="qwen3:8b"
+SHRI_AI_EMBEDDING_MODEL="qwen3-embedding:0.6b"
+SHRI_AI_EMBEDDING_DIMENSIONS="1024"
+```
+
+All model and speech base URLs are server-only and restricted to loopback
+hosts. No hosted AI provider or API key is used.
 
 ## Knowledge Base
 
