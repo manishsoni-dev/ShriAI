@@ -40,6 +40,10 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
     redirect("/sign-in");
   }
 
+  if (!user.onboardedAt) {
+    redirect("/onboarding");
+  }
+
   const workspace = await ensureDefaultWorkspace(user);
   const conversations = await listConversations({
     userId: user.id,
@@ -85,6 +89,9 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
       currentUser={{
         email: user.email,
         name: user.name,
+        languagePreference: user.languagePreference,
+        microphoneConsentGivenAt:
+          user.microphoneConsentGivenAt?.toISOString() ?? null,
       }}
       messages={messages.map((message) => ({
         id: message.id,

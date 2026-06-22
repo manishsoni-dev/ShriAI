@@ -2,11 +2,11 @@ import type { PersonaId } from "@/lib/personas";
 
 /**
  * Natural devotional human voice profiles.
- * Used for both browser Web Speech Synthesis and ElevenLabs TTS.
+ * Client-safe hints used only by the browser SpeechSynthesis engine.
  * These are guidance voice profiles — not claims of divine voice.
  */
 export type VoiceProfile = {
-  /** Keywords to match against SpeechSynthesisVoice.name (case-insensitive) */
+  /** Descriptive hints available to local voice adapters. */
   preferredVoiceKeywords: string[];
   /** Speech rate. 1.0 = normal. Range: 0.1–2. */
   rate: number;
@@ -29,6 +29,8 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
       "arthur",
       "male",
       "en-in",
+      "hi-in",
+      "hindi",
       "en-gb",
     ],
     rate: 0.82,
@@ -44,6 +46,8 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
       "daniel",
       "rishi",
       "en-in",
+      "hi-in",
+      "hindi",
       "en-gb",
       "en-us",
     ],
@@ -55,7 +59,14 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
   },
   shiva: {
     // Deep, meditative — slow pace, spacious pauses, low intensity
-    preferredVoiceKeywords: ["daniel", "arthur", "en-gb", "en-au", "male"],
+    preferredVoiceKeywords: [
+      "daniel",
+      "arthur",
+      "en-gb",
+      "hi-in",
+      "en-au",
+      "male",
+    ],
     rate: 0.72,
     pitch: 0.78,
     volume: 0.8,
@@ -64,7 +75,14 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
   },
   hanuman: {
     // Strong, humble, energetic — clear articulation, devotional courage
-    preferredVoiceKeywords: ["alex", "rishi", "en-in", "en-us", "male"],
+    preferredVoiceKeywords: [
+      "alex",
+      "rishi",
+      "en-in",
+      "hi-in",
+      "en-us",
+      "male",
+    ],
     rate: 0.94,
     pitch: 1.0,
     volume: 0.88,
@@ -80,6 +98,8 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
       "veena",
       "female",
       "en-in",
+      "hi-in",
+      "hindi",
       "en-gb",
     ],
     rate: 0.85,
@@ -98,6 +118,8 @@ export const voiceProfiles: Record<PersonaId, VoiceProfile> = {
       "female",
       "en-au",
       "en-in",
+      "hi-in",
+      "hindi",
     ],
     rate: 0.88,
     pitch: 1.1,

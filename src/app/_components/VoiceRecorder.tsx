@@ -9,11 +9,14 @@ export type { ConversationPhase } from "@/lib/conversation-state";
 type Props = {
   personaDisplayName: string;
   disabled?: boolean;
+  hasStoredConsent: boolean;
   idleLabel?: string;
+  language?: "en" | "hi";
   voiceState: ConversationPhase;
   onTranscript: (text: string, voiceTraceId?: string) => void;
   onError: (message: string) => void;
   onPermissionRequest?: () => void;
+  onConsentMissing?: () => void;
   onRecordingStart?: () => void;
   onTranscribing?: () => void;
   onInterruptSpeaking?: () => void;
@@ -51,11 +54,14 @@ function getSupportedMimeType(): string {
 export function VoiceRecorder({
   personaDisplayName,
   disabled = false,
+  hasStoredConsent,
   idleLabel,
+  language = "en",
   voiceState,
   onTranscript,
   onError,
   onPermissionRequest,
+  onConsentMissing,
   onRecordingStart,
   onTranscribing,
   onInterruptSpeaking,
@@ -66,6 +72,7 @@ export function VoiceRecorder({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const recordingTimerRef = useRef<number | null>(null);
 
   const isRecording = voiceState === "listening";
   const isInterruptingPlayback =
@@ -92,6 +99,9 @@ export function VoiceRecorder({
     return () => {
       mediaRecorderRef.current?.stop();
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      if (recordingTimerRef.current !== null) {
+        window.clearTimeout(recordingTimerRef.current);
+      }
     };
   }, []);
 
@@ -100,6 +110,10 @@ export function VoiceRecorder({
     if (!recorder || recorder.state === "inactive") return;
 
     return new Promise<void>((resolve) => {
+      if (recordingTimerRef.current !== null) {
+        window.clearTimeout(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
       recorder.onstop = async () => {
         const chunks = chunksRef.current;
         chunksRef.current = [];
@@ -134,6 +148,7 @@ export function VoiceRecorder({
             blob,
             `recording.${mimeType.split("/")[1]?.split(";")[0] ?? "webm"}`,
           );
+          formData.append("language", language);
 
           const response = await fetch("/api/voice/transcribe", {
             method: "POST",
@@ -162,9 +177,16 @@ export function VoiceRecorder({
 
       recorder.stop();
     });
-  }, [onTranscript, onError, onTranscribing]);
+  }, [language, onTranscript, onError, onTranscribing]);
 
   async function startRecording() {
+    if (!hasStoredConsent) {
+      onConsentMissing?.();
+      onError(
+        "Microphone processing consent is required before recording. Enable it below or type your question.",
+      );
+      return;
+    }
     if (permissionState === "unsupported") {
       onError(
         "Voice recording is not supported in this browser. Please type your question.",
@@ -202,6 +224,12 @@ export function VoiceRecorder({
 
       mediaRecorderRef.current = recorder;
       recorder.start(250); // collect chunks every 250ms
+      recordingTimerRef.current = window.setTimeout(() => {
+        onError(
+          "Recording reached the 90-second limit and is being transcribed.",
+        );
+        void stopRecordingAndTranscribe();
+      }, 90_000);
       onRecordingStart?.();
     } catch (error) {
       if (
@@ -248,6 +276,7 @@ export function VoiceRecorder({
 
   const isUnsupported = permissionState === "unsupported";
   const isDenied = permissionState === "denied";
+  const isConsentMissing = !hasStoredConsent;
 
   return (
     <div className="flex flex-col items-center gap-3">
@@ -278,7 +307,7 @@ export function VoiceRecorder({
         }
         aria-pressed={isRecording}
         className={`relative flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all duration-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300 ${
-          isUnsupported || isDenied || disabled
+          isUnsupported || isDenied || isConsentMissing || disabled
             ? "cursor-not-allowed border-amber-200/15 bg-white/[0.04] opacity-45"
             : isRecording
               ? "border-red-400/70 bg-red-500/18 shadow-[0_0_32px_rgba(248,113,113,0.45)] scale-110"
@@ -295,11 +324,13 @@ export function VoiceRecorder({
             ? "Voice recording not supported in this browser"
             : isDenied
               ? "Microphone access denied — check browser settings"
-              : isRecording
-                ? "Click to stop recording"
-                : isInterruptingPlayback
-                  ? "Click to interrupt and speak"
-                  : "Click to speak"
+              : isConsentMissing
+                ? "Microphone processing consent required"
+                : isRecording
+                  ? "Click to stop recording"
+                  : isInterruptingPlayback
+                    ? "Click to interrupt and speak"
+                    : "Click to speak"
         }
         type="button"
       >
@@ -328,6 +359,16 @@ export function VoiceRecorder({
         >
           Microphone access was denied. Allow access in your browser settings,
           or type your question below.
+        </p>
+      )}
+
+      {isConsentMissing && !isUnsupported && (
+        <p
+          className="max-w-[240px] text-center text-xs leading-5 text-amber-200/65"
+          role="status"
+        >
+          Enable local microphone processing before recording, or use typed
+          input.
         </p>
       )}
 

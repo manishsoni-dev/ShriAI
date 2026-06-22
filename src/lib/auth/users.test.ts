@@ -19,6 +19,9 @@ vi.mock("@/lib/db", () => ({
       create: mocks.userCreate,
       findUnique: mocks.userFindUnique,
     },
+    betaInvite: {
+      findUnique: vi.fn().mockResolvedValue({ id: "valid-invite" }),
+    },
   },
 }));
 

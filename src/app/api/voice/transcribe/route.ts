@@ -1,15 +1,21 @@
 import "server-only";
 
+import { isIP } from "node:net";
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 
 import { auth } from "@/auth";
 import { env } from "@/env";
+import { db } from "@/lib/db";
 import { logObservabilityEvent } from "@/lib/observability";
 import { checkRateLimit, rateLimitResponseHeaders } from "@/lib/rate-limit";
+import { hasStoredMicrophoneConsent } from "@/lib/voice/consent";
+import {
+  LocalSpeechClient,
+  LocalSpeechError,
+  localSpeechStatus,
+} from "@/lib/voice/local-speech";
 
-const MAX_AUDIO_BYTES = 25 * 1024 * 1024; // 25 MB — Whisper limit
-const SAFE_STT_CONFIG_ERROR = "Speech transcription is not configured.";
+const MAX_AUDIO_BYTES = 10 * 1024 * 1024;
 const ALLOWED_AUDIO_MIME_TYPES = new Set([
   "audio/flac",
   "audio/m4a",
@@ -23,16 +29,53 @@ const ALLOWED_AUDIO_MIME_TYPES = new Set([
   "audio/x-wav",
 ]);
 
-type STTProvider = "openai" | "deepgram" | "google";
-
 export const runtime = "nodejs";
+
+type VoiceErrorCode =
+  | "AUDIO_TOO_LARGE"
+  | "CONSENT_REQUIRED"
+  | "EMPTY_AUDIO"
+  | "INVALID_MULTIPART"
+  | "MISSING_AUDIO"
+  | "NO_SPEECH"
+  | "RATE_LIMITED"
+  | "TRANSCRIPTION_TIMEOUT"
+  | "TRANSCRIPTION_UNAVAILABLE"
+  | "UNSUPPORTED_MEDIA";
+
+function voiceError(
+  code: VoiceErrorCode,
+  message: string,
+  status: number,
+  voiceTraceId?: string,
+  headers?: HeadersInit,
+) {
+  return NextResponse.json(
+    { code, error: message, ...(voiceTraceId ? { voiceTraceId } : {}) },
+    { status, headers },
+  );
+}
 
 export async function POST(request: Request) {
   const startedAt = Date.now();
-  // Auth guard
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const user = await db.user.findUnique({
+    where: { id: session.user.id },
+    select: { microphoneConsentGivenAt: true },
+  });
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!hasStoredMicrophoneConsent(user)) {
+    return voiceError(
+      "CONSENT_REQUIRED",
+      "Microphone processing consent is required before recording.",
+      403,
+    );
   }
 
   const rateLimit = checkRateLimit({
@@ -41,12 +84,27 @@ export async function POST(request: Request) {
     windowMs: 60_000,
   });
   if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: "Too many voice transcription requests. Please slow down." },
-      {
-        status: 429,
-        headers: rateLimitResponseHeaders(rateLimit.retryAfterMs),
-      },
+    return voiceError(
+      "RATE_LIMITED",
+      "Too many voice transcription requests. Please slow down.",
+      429,
+      undefined,
+      rateLimitResponseHeaders(rateLimit.retryAfterMs),
+    );
+  }
+
+  const ipRateLimit = checkRateLimit({
+    key: `stt-ip:${clientIp(request)}`,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  if (!ipRateLimit.allowed) {
+    return voiceError(
+      "RATE_LIMITED",
+      "Too many voice transcription requests from this network.",
+      429,
+      undefined,
+      rateLimitResponseHeaders(ipRateLimit.retryAfterMs),
     );
   }
 
@@ -54,9 +112,10 @@ export async function POST(request: Request) {
   try {
     formData = await request.formData();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid request — expected multipart/form-data." },
-      { status: 400 },
+    return voiceError(
+      "INVALID_MULTIPART",
+      "Invalid request - expected multipart/form-data.",
+      400,
     );
   }
 
@@ -65,299 +124,166 @@ export async function POST(request: Request) {
     typeof formData.get("traceId") === "string"
       ? String(formData.get("traceId"))
       : crypto.randomUUID();
+  const safeTraceId = traceId.trim().slice(0, 128) || crypto.randomUUID();
+  const rawLanguage = formData.get("language");
+  const language = typeof rawLanguage === "string" ? rawLanguage : "en";
 
   if (!audioField || !(audioField instanceof Blob)) {
-    return NextResponse.json(
-      { error: "Missing audio field in form data." },
-      { status: 400 },
+    return voiceError(
+      "MISSING_AUDIO",
+      "Missing audio field in form data.",
+      400,
+      safeTraceId,
     );
   }
-
   if (audioField.size === 0) {
-    return NextResponse.json(
-      { error: "Audio file is empty." },
-      { status: 400 },
-    );
+    return voiceError("EMPTY_AUDIO", "Audio file is empty.", 400, safeTraceId);
   }
-
   if (audioField.size > MAX_AUDIO_BYTES) {
-    return NextResponse.json(
-      { error: "Audio file too large. Maximum is 25 MB." },
-      { status: 413 },
+    return voiceError(
+      "AUDIO_TOO_LARGE",
+      "Audio file too large. Maximum is 10 MB or 90 seconds.",
+      413,
+      safeTraceId,
     );
   }
 
   const audioMimeType = baseMimeType(audioField.type);
   if (!audioMimeType || !ALLOWED_AUDIO_MIME_TYPES.has(audioMimeType)) {
-    return NextResponse.json(
-      {
-        error:
-          "Unsupported audio format. Please use webm, mp4, mpeg, ogg, wav, m4a, or flac audio.",
-        voiceTraceId: traceId,
-      },
-      { status: 415 },
+    return voiceError(
+      "UNSUPPORTED_MEDIA",
+      "Unsupported audio format. Please use webm, mp4, mpeg, ogg, wav, m4a, or flac audio.",
+      415,
+      safeTraceId,
     );
   }
 
-  const provider = env.STT_PROVIDER;
-
-  if (!hasProviderKey(provider)) {
-    void logObservabilityEvent({
-      traceId,
-      eventType: "stt",
-      status: "skipped",
-      userId: session.user.id,
-      model: provider,
-      latencyMs: Date.now() - startedAt,
-      payload: {
-        provider,
-        audioBytes: audioField.size,
-        error: SAFE_STT_CONFIG_ERROR,
-      },
-    });
-    return NextResponse.json(
-      { error: SAFE_STT_CONFIG_ERROR, voiceTraceId: traceId },
-      { status: 503 },
-    );
-  }
+  const client = new LocalSpeechClient({
+    sttBaseUrl: env.STT_BASE_URL,
+    timeoutMs: env.STT_TIMEOUT_MS,
+    voiceServiceToken: env.STT_SERVICE_TOKEN,
+  });
 
   try {
-    const text = await transcribeAudio(audioField, provider);
-
-    if (!text) {
-      void logObservabilityEvent({
-        traceId,
-        eventType: "stt",
-        status: "skipped",
-        userId: session.user.id,
-        model: provider,
-        latencyMs: Date.now() - startedAt,
-        payload: {
-          provider,
-          audioBytes: audioField.size,
-          error: "No speech detected in the recording.",
-        },
-      });
-      return NextResponse.json(
-        {
-          error: "No speech detected in the recording.",
-          voiceTraceId: traceId,
-        },
-        { status: 422 },
+    const transcript = await client.transcribe({
+      audio: audioField,
+      language,
+      filename: `recording.${mimeExtension(audioMimeType)}`,
+    });
+    if (!transcript.text) {
+      return voiceError(
+        "NO_SPEECH",
+        "No speech detected in the recording.",
+        422,
+        safeTraceId,
       );
     }
 
     void logObservabilityEvent({
-      traceId,
+      traceId: safeTraceId,
       eventType: "stt",
       status: "success",
       userId: session.user.id,
-      model: provider,
+      model: env.STT_MODEL,
       latencyMs: Date.now() - startedAt,
       payload: {
-        provider,
+        provider: "local-whisper",
         audioBytes: audioField.size,
-        transcriptLength: text.length,
-        transcriptPreview: text.replace(/\s+/g, " ").trim().slice(0, 120),
+        transcriptLength: transcript.text.length,
+        detectedLanguage: transcript.language,
+        audioDurationSeconds: transcript.durationSeconds,
+        inferenceMs: transcript.inferenceMs,
       },
     });
 
-    return NextResponse.json({ text, voiceTraceId: traceId });
+    return NextResponse.json({
+      text: transcript.text,
+      transcript,
+      voiceTraceId: safeTraceId,
+    });
   } catch (error) {
-    console.error("[transcribe] STT error:", error);
+    const status = localSpeechStatus(error);
+    const responseError = transcriptionError(error, status);
     void logObservabilityEvent({
-      traceId,
+      traceId: safeTraceId,
       eventType: "stt",
       status: "error",
       userId: session.user.id,
-      model: provider,
+      model: env.STT_MODEL,
       latencyMs: Date.now() - startedAt,
       payload: {
-        provider,
+        provider: "local-whisper",
         audioBytes: audioField.size,
         error: error instanceof Error ? error.message : String(error),
       },
     });
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Transcription failed. Please try again.",
-        voiceTraceId: traceId,
-      },
-      { status: 500 },
+    return voiceError(
+      responseError.code,
+      responseError.message,
+      status,
+      safeTraceId,
     );
   }
 }
 
-function hasProviderKey(provider: STTProvider): boolean {
-  if (provider === "openai") return Boolean(env.OPENAI_API_KEY);
-  if (provider === "deepgram") return Boolean(env.DEEPGRAM_API_KEY);
-  if (provider === "google") return Boolean(env.GOOGLE_API_KEY);
-  return false;
-}
-
-async function transcribeAudio(
-  audioField: Blob,
-  provider: STTProvider,
-): Promise<string> {
-  if (provider === "openai") {
-    return transcribeWithOpenAI(audioField);
+function transcriptionError(error: unknown, status: number) {
+  if (error instanceof LocalSpeechError) {
+    if (error.serviceCode === "AUDIO_TOO_LONG") {
+      return {
+        code: "AUDIO_TOO_LARGE" as const,
+        message: "Recording is too long. Maximum duration is 90 seconds.",
+      };
+    }
+    if (
+      error.serviceCode === "UNSUPPORTED_MEDIA" ||
+      error.serviceCode === "INVALID_AUDIO"
+    ) {
+      return {
+        code: "UNSUPPORTED_MEDIA" as const,
+        message:
+          "The recording format could not be decoded. Try recording again.",
+      };
+    }
   }
-
-  if (provider === "deepgram") {
-    return transcribeWithDeepgram(audioField);
-  }
-
-  return transcribeWithGoogle(audioField);
-}
-
-async function transcribeWithOpenAI(audioField: Blob): Promise<string> {
-  if (!env.OPENAI_API_KEY) {
-    throw new Error(SAFE_STT_CONFIG_ERROR);
-  }
-
-  const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-
-  // Whisper accepts: flac, mp3, mp4, mpeg, mpga, m4a, ogg, wav, webm
-  const mimeType = audioField.type || "audio/webm";
-  const ext = mimeExtension(mimeType);
-  const audioFile = new File([audioField], `recording.${ext}`, {
-    type: mimeType,
-  });
-
-  const transcription = await client.audio.transcriptions.create({
-    file: audioFile,
-    model: "whisper-1",
-    language: "en",
-    response_format: "text",
-  });
-
-  const text =
-    typeof transcription === "string"
-      ? transcription.trim()
-      : String(transcription).trim();
-
-  return text;
-}
-
-async function transcribeWithDeepgram(audioField: Blob): Promise<string> {
-  if (!env.DEEPGRAM_API_KEY) {
-    throw new Error(SAFE_STT_CONFIG_ERROR);
-  }
-
-  const response = await fetch(
-    "https://api.deepgram.com/v1/listen?model=nova-2&smart_format=true",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${env.DEEPGRAM_API_KEY}`,
-        "Content-Type": audioField.type || "audio/webm",
-      },
-      body: audioField,
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Deepgram transcription failed (${response.status}).`);
-  }
-
-  const data = (await response.json()) as {
-    results?: {
-      channels?: Array<{
-        alternatives?: Array<{
-          transcript?: string;
-        }>;
-      }>;
+  if (status === 504) {
+    return {
+      code: "TRANSCRIPTION_TIMEOUT" as const,
+      message:
+        "Local speech transcription timed out. You can still type your question.",
     };
-  };
-
-  return (
-    data.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim() ?? ""
-  );
-}
-
-async function transcribeWithGoogle(audioField: Blob): Promise<string> {
-  if (!env.GOOGLE_API_KEY) {
-    throw new Error(SAFE_STT_CONFIG_ERROR);
   }
-
-  const audioBase64 = Buffer.from(await audioField.arrayBuffer()).toString(
-    "base64",
-  );
-  const response = await fetch(
-    `https://speech.googleapis.com/v1/speech:recognize?key=${env.GOOGLE_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        config: {
-          encoding: googleEncoding(audioField.type),
-          languageCode: "en-US",
-          enableAutomaticPunctuation: true,
-        },
-        audio: {
-          content: audioBase64,
-        },
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Google transcription failed (${response.status}).`);
-  }
-
-  const data = (await response.json()) as {
-    results?: Array<{
-      alternatives?: Array<{
-        transcript?: string;
-      }>;
-    }>;
+  return {
+    code: "TRANSCRIPTION_UNAVAILABLE" as const,
+    message:
+      "Local speech transcription is unavailable. Start the faster-whisper service or type your question.",
   };
-
-  return (
-    data.results
-      ?.map((result) => result.alternatives?.[0]?.transcript?.trim())
-      .filter(Boolean)
-      .join(" ")
-      .trim() ?? ""
-  );
 }
 
-function googleEncoding(mime: string): string {
-  const base = baseMimeType(mime);
-
-  if (base === "audio/ogg") return "OGG_OPUS";
-  if (base === "audio/webm") return "WEBM_OPUS";
-  if (base === "audio/mp4") return "MP3";
-  if (base === "audio/mpeg") return "MP3";
-  if (base === "audio/wav" || base === "audio/x-wav") return "LINEAR16";
-
-  return "WEBM_OPUS";
+function baseMimeType(mime: string) {
+  return mime.split(";", 1)[0]?.trim().toLowerCase() ?? "";
 }
 
-/** Map MIME type to Whisper-acceptable file extension. */
-function mimeExtension(mime: string): string {
-  const map: Record<string, string> = {
-    "audio/webm": "webm",
-    "audio/webm;codecs=opus": "webm",
-    "audio/ogg": "ogg",
-    "audio/ogg;codecs=opus": "ogg",
-    "audio/mp4": "mp4",
-    "audio/mpeg": "mp3",
-    "audio/wav": "wav",
-    "audio/x-wav": "wav",
+function mimeExtension(mime: string) {
+  const extensions: Record<string, string> = {
     "audio/flac": "flac",
     "audio/m4a": "m4a",
+    "audio/mp4": "mp4",
+    "audio/mpeg": "mp3",
+    "audio/mpga": "mp3",
+    "audio/ogg": "ogg",
+    "audio/wav": "wav",
+    "audio/webm": "webm",
     "audio/x-m4a": "m4a",
+    "audio/x-wav": "wav",
   };
-  const base = baseMimeType(mime);
-  return map[base] ?? map[mime.toLowerCase()] ?? "webm";
+  return extensions[mime] ?? "webm";
 }
 
-function baseMimeType(mime: string): string {
-  return mime.split(";")[0]?.trim().toLowerCase() ?? "";
+function clientIp(request: Request) {
+  const forwarded = request.headers
+    .get("x-forwarded-for")
+    ?.split(",", 1)[0]
+    ?.trim();
+  const candidate = forwarded || request.headers.get("x-real-ip")?.trim();
+  return candidate && isIP(candidate) ? candidate : "unknown";
 }
