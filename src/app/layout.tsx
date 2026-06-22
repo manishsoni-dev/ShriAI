@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AudioExperienceProvider } from "@/app/_components/AudioExperienceProvider";
+import { SharedCosmicBackground } from "@/app/_components/SharedCosmicBackground";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,8 +20,12 @@ export default function RootLayout({
       className="var-font-geist-sans var-font-geist-mono var-font-cormorant var-font-noto-devanagari h-full antialiased"
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
-        {children}
+      <body className="site-root min-h-full flex flex-col antialiased">
+        <SharedCosmicBackground />
+        <div className="site-atmosphere" aria-hidden="true" />
+        <div className="application-content site-content flex min-h-full flex-col flex-1">
+          {children}
+        </div>
         <AudioExperienceProvider />
       </body>
     </html>

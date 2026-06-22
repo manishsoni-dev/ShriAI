@@ -60,7 +60,7 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <main className="min-h-screen bg-[#070504] px-6 py-8 text-amber-50">
+    <main className="min-h-screen bg-[var(--page-surface)] px-6 py-8 text-amber-50">
       <section className="mx-auto flex w-full max-w-6xl flex-col gap-8">
         <div className="flex flex-col gap-4 border-b border-amber-200/10 pb-6 md:flex-row md:items-center md:justify-between">
           <div>
@@ -85,7 +85,7 @@ export default async function DashboardPage() {
           </form>
         </div>
 
-        <div className="rounded-lg border border-amber-200/12 bg-[#120c08]/70 p-5 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
+        <div className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] p-5 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
           <p className="text-sm font-semibold uppercase tracking-[0.26em] text-amber-200/75">
             Current workspace
           </p>
@@ -116,7 +116,7 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-amber-200/12 bg-[#120c08]/70 p-5 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
+          <div className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] p-5 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold uppercase tracking-[0.26em] text-amber-200/75">
                 Recent Conversations
@@ -164,7 +164,7 @@ export default async function DashboardPage() {
             )}
           </div>
 
-          <div className="rounded-lg border border-amber-200/12 bg-[#120c08]/70 p-5 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur h-fit">
+          <div className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] p-5 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur h-fit">
             <p className="text-sm font-semibold uppercase tracking-[0.26em] text-amber-200/75">
               Your AI usage
             </p>

@@ -52,7 +52,7 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
 
 export function MarketingNav() {
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-amber-200/10 bg-[#080604]/75 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-amber-200/10 bg-[var(--page-surface)] backdrop-blur-xl">
       <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-5 px-5 md:px-8">
         <BrandMark />
         <nav className="hidden items-center gap-6 text-sm text-amber-100/72 lg:flex">
@@ -98,7 +98,7 @@ export function CosmicBackdrop() {
 
 export function PageShell({ children }: { children: ReactNode }) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#070504] text-amber-50">
+    <main className="relative min-h-screen overflow-hidden text-amber-50">
       <CosmicBackdrop />
       <MarketingNav />
       <div className="relative z-10 pt-20">{children}</div>
@@ -165,7 +165,7 @@ export function PersonaCard({
 }) {
   return (
     <article
-      className="group relative overflow-hidden rounded-lg border border-amber-200/12 bg-[#130d0a]/72 p-5 shadow-[0_18px_80px_rgba(0,0,0,0.26)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-[color:var(--persona-color)]/45"
+      className="group relative overflow-hidden rounded-lg border border-amber-200/12 bg-[var(--section-surface)] p-5 shadow-[0_18px_80px_rgba(0,0,0,0.26)] backdrop-blur transition duration-300 hover:-translate-y-1 hover:border-[color:var(--persona-color)]/45"
       style={
         {
           "--persona-color": persona.color,
@@ -228,7 +228,7 @@ export function PersonasGrid({ detailed = false }: { detailed?: boolean }) {
 
 export function SacredPanel({ children }: { children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-amber-200/12 bg-[#120c08]/70 p-6 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
+    <section className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] p-6 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
       {children}
     </section>
   );

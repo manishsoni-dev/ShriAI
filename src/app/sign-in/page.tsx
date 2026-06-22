@@ -18,7 +18,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#070504] px-6 py-10 text-amber-50">
+    <main className="min-h-screen bg-[var(--page-surface)] px-6 py-10 text-amber-50">
       <section className="mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-6xl items-center gap-10 md:grid-cols-[1fr_420px]">
         <div className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-[0.26em] text-amber-200/75">
@@ -33,7 +33,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           </p>
         </div>
 
-        <div className="rounded-lg border border-amber-200/12 bg-[#120c08]/70 p-6 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
+        <div className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] p-6 shadow-[0_20px_90px_rgba(0,0,0,0.3)] backdrop-blur">
           <h2 className="font-serif text-2xl font-semibold text-amber-50">
             Account access
           </h2>

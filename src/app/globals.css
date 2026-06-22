@@ -23,9 +23,34 @@
   --font-devanagari: var(--font-noto-devanagari);
 }
 
+:root {
+  --page-surface: rgba(7, 5, 4, 0.58);
+  --section-surface: rgba(10, 7, 5, 0.72);
+  --card-surface: rgba(15, 10, 7, 0.88);
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+.site-root {
+  position: relative;
+  min-height: 100%;
+  isolation: isolate;
+  background: #050403;
+}
+
+.site-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.site-content {
+  position: relative;
+  z-index: 10;
 }
 
 ::selection {
@@ -49,11 +74,27 @@ body {
       circle at 82% 22%,
       rgba(168, 85, 247, 0.16),
       transparent 27rem
-    ),
-    linear-gradient(135deg, #080504 0%, #130906 35%, #050816 68%, #080504 100%);
+    );
   animation: cosmic-drift 24s ease-in-out infinite alternate;
   pointer-events: none;
   will-change: transform, filter;
+}
+
+.cosmic-backdrop {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  contain: strict;
+}
+
+.cosmic-backdrop canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .shri-prefix {
