@@ -3,10 +3,21 @@ import "dotenv/config";
 import { db } from "../src/lib/db";
 
 async function main() {
+  if (
+    process.env.NODE_ENV !== "test" &&
+    process.env.DATABASE_URL &&
+    !process.env.DATABASE_URL.includes("test")
+  ) {
+    console.error(
+      "Fatal: This script is restricted to isolated test databases.",
+    );
+    process.exit(1);
+  }
+
   const pendingReviews = await db.scriptureChunkReview.findMany({
     where: { reviewStatus: "pending" },
     include: { chunk: true },
-    take: 50,
+    take: 1000,
     orderBy: { id: "asc" },
   });
 

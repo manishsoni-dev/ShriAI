@@ -13,14 +13,16 @@ import {
   type CSSProperties,
 } from "react";
 
-import { CosmicOrbitEngine } from "@/app/_components/CosmicOrbitEngine";
 import { BrandMark } from "@/app/_components/devotional-shell";
 import { PersonaSymbol } from "@/app/_components/persona-symbol";
 import {
   VoiceRecorder,
   type ConversationPhase,
 } from "@/app/_components/VoiceRecorder";
-import { createConversationAction } from "@/app/chat/actions";
+import {
+  createConversationAction,
+  giveMicrophoneConsentAction,
+} from "@/app/chat/actions";
 import {
   createTurnId,
   isActiveConversationPhase,
@@ -33,11 +35,7 @@ import {
   type Persona,
   type PersonaId,
 } from "@/lib/personas";
-import {
-  cleanTextForTTS,
-  findBestVoice,
-  truncateForTTS,
-} from "@/lib/tts-utils";
+import { speakWithBrowserSpeech } from "@/lib/voice/browser-speech";
 import { getVoiceProfile } from "@/lib/voiceProfiles";
 
 type ConversationItem = {
@@ -52,6 +50,11 @@ type ConversationItem = {
 type Citation = {
   ref: string;
   source: string;
+  scripture?: string;
+  chapter?: string;
+  verseRange?: string;
+  excerpt?: string;
+  sourceId?: string;
 };
 
 type ChatMessage = {
@@ -88,6 +91,7 @@ type StreamEvent =
       message: ChatMessage;
       citations?: Citation[];
       spokenAnswer?: string;
+      voiceEligible?: boolean;
       traceId?: string;
       turnId?: string;
     }
@@ -104,12 +108,6 @@ type StreamEvent =
       turnId: string;
     };
 
-type TTSResponse = {
-  audioBase64?: string;
-  mimeType?: string;
-  error?: string;
-};
-
 type ActiveTurn = {
   abortController: AbortController;
   conversationId: string;
@@ -124,6 +122,8 @@ type ChatShellProps = {
   currentUser: {
     email: string;
     name: string | null;
+    languagePreference: string;
+    microphoneConsentGivenAt: string | null;
   };
   messages: ChatMessage[];
   selectedConversation: {
@@ -178,7 +178,7 @@ function MessageBubble({
           className={`divine-text-reveal rounded-lg border px-4 py-3 shadow-[0_16px_50px_rgba(0,0,0,0.26)] ${
             isUser
               ? "border-amber-300/30 bg-gradient-to-br from-amber-300 to-orange-500 text-[#170d05]"
-              : "border-[color:var(--persona-color)]/25 bg-[#120c08]/88 text-amber-50"
+              : "border-[color:var(--persona-color)]/25 bg-[var(--card-surface)] text-amber-50"
           } ${message.pending ? "opacity-70" : ""}`}
           style={personaStyle(persona)}
         >
@@ -195,7 +195,7 @@ function MessageBubble({
               <span
                 key={citation.ref}
                 className="inline-flex items-center gap-1 rounded-full border border-amber-400/20 bg-amber-400/8 px-2.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-300/80"
-                title={`Source: ${citation.source}`}
+                title={citation.excerpt ?? `Source: ${citation.source}`}
               >
                 <svg
                   aria-hidden="true"
@@ -205,7 +205,9 @@ function MessageBubble({
                 >
                   <path d="M6 1a5 5 0 1 0 0 10A5 5 0 0 0 6 1zm0 1.5a.75.75 0 0 1 .75.75v2.5h1.5a.75.75 0 0 1 0 1.5H6.75v1a.75.75 0 0 1-1.5 0v-1H3.75a.75.75 0 0 1 0-1.5h1.5V3.25A.75.75 0 0 1 6 2.5z" />
                 </svg>
-                {citation.ref}
+                {citation.scripture && citation.chapter && citation.verseRange
+                  ? `${citation.scripture} ${citation.chapter}.${citation.verseRange}`
+                  : citation.ref}
               </span>
             ))}
           </div>
@@ -213,17 +215,6 @@ function MessageBubble({
       </div>
     </div>
   );
-}
-
-function audioBase64ToObjectUrl(audioBase64: string, mimeType: string) {
-  const binary = window.atob(audioBase64);
-  const bytes = new Uint8Array(binary.length);
-
-  for (let index = 0; index < binary.length; index++) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-
-  return URL.createObjectURL(new Blob([bytes], { type: mimeType }));
 }
 
 export function ChatShell({
@@ -250,14 +241,16 @@ export function ChatShell({
   const [pendingVoiceTraceId, setPendingVoiceTraceId] = useState<string | null>(
     null,
   );
-  const [playbackBlocked, setPlaybackBlocked] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [isCreatingConversation, startCreateConversation] = useTransition();
+  const [isSavingMicConsent, startSavingMicConsent] = useTransition();
+  const [hasMicConsent, setHasMicConsent] = useState(
+    Boolean(currentUser.microphoneConsentGivenAt),
+  );
 
-  const audioResponseRef = useRef<HTMLAudioElement | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeTurnRef = useRef<ActiveTurn | null>(null);
-  const activeAudioUrlRef = useRef<string | null>(null);
+  const speechAbortRef = useRef<AbortController | null>(null);
   const pendingDeltaRef = useRef("");
   const deltaFrameRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -288,13 +281,8 @@ export function ChatShell({
       window.cancelAnimationFrame(deltaFrameRef.current);
       deltaFrameRef.current = null;
     }
-    audioResponseRef.current?.pause();
-    audioResponseRef.current = null;
-    if (activeAudioUrlRef.current) {
-      URL.revokeObjectURL(activeAudioUrlRef.current);
-      activeAudioUrlRef.current = null;
-    }
-    window.speechSynthesis?.cancel();
+    speechAbortRef.current?.abort();
+    speechAbortRef.current = null;
     setPhase(hadActiveWork ? "interrupted" : "idle");
     if (hadActiveWork) {
       window.setTimeout(() => setPhase("idle"), 0);
@@ -353,17 +341,9 @@ export function ChatShell({
       if (deltaFrameRef.current !== null) {
         window.cancelAnimationFrame(deltaFrameRef.current);
       }
-      window.speechSynthesis?.cancel();
-      audioResponseRef.current?.pause();
-      if (activeAudioUrlRef.current) {
-        URL.revokeObjectURL(activeAudioUrlRef.current);
-      }
+      speechAbortRef.current?.abort();
     };
   }, []);
-
-  const speakBrowserRef = useRef<
-    ((text: string, turnId?: string) => void) | null
-  >(null);
 
   const isCurrentTurn = useCallback((turnId?: string) => {
     return Boolean(
@@ -402,187 +382,66 @@ export function ChatShell({
     });
   }
 
-  // ─── Browser TTS fallback ─────────────────────────────────────────────────
-  function speakBrowser(text: string, turnId?: string) {
-    if (turnId && !isCurrentTurn(turnId)) {
-      return;
-    }
-
-    if (!("speechSynthesis" in window)) {
-      if (turnId && isCurrentTurn(turnId)) {
-        activeTurnRef.current = null;
-        abortControllerRef.current = null;
-      }
-      setPhase("idle");
-      return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const profile = getVoiceProfile(activePersonaId);
-    const cleaned = cleanTextForTTS(text);
-    const truncated = truncateForTTS(cleaned, profile.maxTtsChars);
-
-    const utterance = new SpeechSynthesisUtterance(truncated);
-    utterance.rate = profile.rate;
-    utterance.pitch = profile.pitch;
-    utterance.volume = profile.volume;
-
-    utterance.onstart = () => {
-      window.dispatchEvent(new CustomEvent("shri-ai:tts-start"));
-    };
-    utterance.onend = () => {
-      if (turnId && !isCurrentTurn(turnId)) return;
-      activeTurnRef.current = null;
-      abortControllerRef.current = null;
-      setPhase("idle");
-      window.dispatchEvent(new CustomEvent("shri-ai:tts-end"));
-    };
-    utterance.onerror = () => {
-      if (turnId && !isCurrentTurn(turnId)) return;
-      activeTurnRef.current = null;
-      abortControllerRef.current = null;
-      setPhase("idle");
-      window.dispatchEvent(new CustomEvent("shri-ai:tts-end"));
-    };
-
-    const selectVoiceAndSpeak = () => {
-      const voice = findBestVoice(profile);
-      if (voice) utterance.voice = voice;
-      if (turnId && !isCurrentTurn(turnId)) return;
-      setPhase("speaking");
-      window.dispatchEvent(new CustomEvent("shri-ai:tts-start"));
-      window.speechSynthesis.speak(utterance);
-    };
-
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      selectVoiceAndSpeak();
-    } else {
-      window.speechSynthesis.addEventListener(
-        "voiceschanged",
-        selectVoiceAndSpeak,
-        {
-          once: true,
-        },
-      );
-    }
-  }
-
-  // Keep ref in sync with latest speakBrowser so playElevenLabsTTS can call it
-  useEffect(() => {
-    speakBrowserRef.current = speakBrowser;
-  });
-
-  // ─── ElevenLabs TTS ───────────────────────────────────────────────────────
-  const playElevenLabsTTS = useCallback(
+  const playBrowserTTS = useCallback(
     async ({
-      assistantMessageId,
-      text,
-      traceId,
+      personaId,
+      spokenAnswer,
       turnId,
     }: {
-      assistantMessageId: string;
-      text: string;
-      traceId: string;
+      personaId: PersonaId;
+      spokenAnswer: string;
       turnId: string;
     }) => {
-      if (!isCurrentTurn(turnId)) {
+      if (!isCurrentTurn(turnId)) return;
+
+      const controller = new AbortController();
+      speechAbortRef.current?.abort();
+      speechAbortRef.current = controller;
+      setPhase("speaking");
+
+      const result = await speakWithBrowserSpeech({
+        text: spokenAnswer,
+        language: currentUser.languagePreference === "hi" ? "hi" : "en",
+        profile: getVoiceProfile(personaId),
+        signal: controller.signal,
+        onStart: () => {
+          if (isCurrentTurn(turnId)) {
+            window.dispatchEvent(new CustomEvent("shri-ai:tts-start"));
+          }
+        },
+      });
+
+      if (speechAbortRef.current === controller) {
+        speechAbortRef.current = null;
+      }
+      if (!isCurrentTurn(turnId) || result === "cancelled") return;
+      if (result === "failed" || result === "unavailable") {
+        activeTurnRef.current = null;
+        abortControllerRef.current = null;
+        setPhase("idle");
+        setErrorMessage(
+          "Browser speech is unavailable. The text response remains available.",
+        );
         return;
       }
 
-      try {
-        setPhase("speaking");
-        setPlaybackBlocked(false);
-
-        const response = await fetch("/api/voice/tts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ assistantMessageId, traceId, turnId }),
-        });
-
-        const data = (await response
-          .json()
-          .catch(() => null)) as TTSResponse | null;
-
-        if (!response.ok || !data?.audioBase64) {
-          console.warn("[tts] ElevenLabs failed:", data?.error);
-          speakBrowserRef.current?.(text, turnId);
-          return;
-        }
-
-        if (!isCurrentTurn(turnId)) {
-          return;
-        }
-
-        const url = audioBase64ToObjectUrl(
-          data.audioBase64,
-          data.mimeType ?? "audio/mpeg",
-        );
-
-        if (activeAudioUrlRef.current) {
-          URL.revokeObjectURL(activeAudioUrlRef.current);
-        }
-
-        const audio = new Audio(url);
-        audioResponseRef.current = audio;
-        activeAudioUrlRef.current = url;
-
-        audio.onplay = () => {
-          window.dispatchEvent(new CustomEvent("shri-ai:tts-start"));
-        };
-        audio.onended = () => {
-          if (!isCurrentTurn(turnId)) return;
-          activeTurnRef.current = null;
-          abortControllerRef.current = null;
-          setPhase("idle");
-          window.dispatchEvent(new CustomEvent("shri-ai:tts-end"));
-          URL.revokeObjectURL(url);
-          activeAudioUrlRef.current = null;
-        };
-        audio.onerror = () => {
-          if (!isCurrentTurn(turnId)) return;
-          activeTurnRef.current = null;
-          abortControllerRef.current = null;
-          setPhase("idle");
-          window.dispatchEvent(new CustomEvent("shri-ai:tts-end"));
-          URL.revokeObjectURL(url);
-          activeAudioUrlRef.current = null;
-        };
-
-        try {
-          await audio.play();
-        } catch (err) {
-          if (!isCurrentTurn(turnId)) return;
-          if (err instanceof DOMException && err.name === "NotAllowedError") {
-            setPlaybackBlocked(true);
-            setPhase("idle");
-          } else {
-            setPhase("idle");
-          }
-        }
-      } catch {
-        if (!isCurrentTurn(turnId)) {
-          return;
-        }
-        setPhase("idle");
-        speakBrowserRef.current?.(text, turnId);
-      }
+      activeTurnRef.current = null;
+      abortControllerRef.current = null;
+      setPhase("idle");
+      window.dispatchEvent(new CustomEvent("shri-ai:tts-end"));
     },
-    [isCurrentTurn],
+    [currentUser.languagePreference, isCurrentTurn],
   );
 
   // ─── Speak orchestrator ───────────────────────────────────────────────────
   const speak = useCallback(
     ({
-      assistantMessageId,
-      text,
-      traceId,
+      personaId,
+      spokenAnswer,
       turnId,
     }: {
-      assistantMessageId: string;
-      text: string;
-      traceId: string;
+      personaId: PersonaId;
+      spokenAnswer: string;
       turnId: string;
     }) => {
       if (!voiceOutput) {
@@ -593,22 +452,21 @@ export function ChatShell({
         setPhase("idle");
         return;
       }
-      void playElevenLabsTTS({ assistantMessageId, text, traceId, turnId });
+      void playBrowserTTS({
+        personaId,
+        spokenAnswer,
+        turnId,
+      });
     },
-    [isCurrentTurn, voiceOutput, playElevenLabsTTS],
+    [isCurrentTurn, voiceOutput, playBrowserTTS],
   );
 
   // ─── Stop audio playback ──────────────────────────────────────────────────
   function stopSpeaking() {
-    audioResponseRef.current?.pause();
-    audioResponseRef.current = null;
-    if (activeAudioUrlRef.current) {
-      URL.revokeObjectURL(activeAudioUrlRef.current);
-      activeAudioUrlRef.current = null;
-    }
+    speechAbortRef.current?.abort();
+    speechAbortRef.current = null;
     window.speechSynthesis?.cancel();
     setPhase("idle");
-    setPlaybackBlocked(false);
     window.dispatchEvent(new CustomEvent("shri-ai:tts-end"));
   }
 
@@ -765,13 +623,17 @@ export function ChatShell({
                 : message,
             ),
           );
-          // Trigger TTS with final text
-          speak({
-            assistantMessageId: event.message.id,
-            text: event.spokenAnswer ?? event.message.content,
-            traceId: event.traceId ?? traceId,
-            turnId,
-          });
+          if (event.voiceEligible && event.spokenAnswer) {
+            speak({
+              personaId: activePersona.id,
+              spokenAnswer: event.spokenAnswer,
+              turnId,
+            });
+          } else if (isCurrentTurn(turnId)) {
+            activeTurnRef.current = null;
+            abortControllerRef.current = null;
+            setPhase("idle");
+          }
           return;
         }
 
@@ -889,7 +751,6 @@ export function ChatShell({
 
   function handlePermissionRequest() {
     setErrorMessage(null);
-    setPlaybackBlocked(false);
   }
 
   function handleVoiceError(message: string) {
@@ -903,7 +764,6 @@ export function ChatShell({
   function handleRecordingStart() {
     window.dispatchEvent(new CustomEvent("shri-ai:voice-start"));
     setErrorMessage(null);
-    setPlaybackBlocked(false);
     if (activeTurnRef.current || activeRequest || phase === "speaking") {
       cancelActiveTurn();
     } else {
@@ -944,18 +804,12 @@ export function ChatShell({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#070504] text-amber-50">
-      <CosmicOrbitEngine
-        centerYRatio={0.34}
-        className="pointer-events-none fixed inset-0 h-full w-full"
-        opacity={0.28}
-        showTrails={false}
-      />
+    <main className="relative min-h-screen overflow-hidden text-amber-50">
       <div aria-hidden="true" className="absolute inset-0 devotional-cosmos" />
       <div aria-hidden="true" className="absolute inset-0 particle-field" />
       <div className="relative z-10 grid min-h-screen lg:grid-cols-[360px_1fr]">
         <aside
-          className={`fixed inset-y-0 left-0 z-30 flex w-[88vw] max-w-[380px] flex-col border-r border-amber-200/12 bg-[#090604]/95 shadow-2xl backdrop-blur-xl transition-transform lg:static lg:w-auto lg:max-w-none lg:translate-x-0 ${
+          className={`fixed inset-y-0 left-0 z-30 flex w-[88vw] max-w-[380px] flex-col border-r border-amber-200/12 bg-[var(--page-surface)] shadow-2xl backdrop-blur-xl transition-transform lg:static lg:w-auto lg:max-w-none lg:translate-x-0 ${
             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
@@ -1094,7 +948,7 @@ export function ChatShell({
         ) : null}
 
         <section className="flex min-h-screen flex-col">
-          <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-amber-200/12 bg-[#080604]/82 px-4 backdrop-blur-xl md:px-6">
+          <header className="sticky top-0 z-10 flex min-h-16 items-center justify-between border-b border-amber-200/12 bg-[var(--page-surface)] px-4 backdrop-blur-xl md:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 className="inline-flex h-10 items-center justify-center rounded-md border border-amber-200/14 bg-white/[0.04] px-3 text-sm font-medium lg:hidden"
@@ -1195,7 +1049,7 @@ export function ChatShell({
                   ))}
                   {phase === "retrieving" || phase === "thinking" ? (
                     <div className="flex justify-start">
-                      <div className="rounded-lg border border-amber-200/12 bg-[#120c08]/88 px-4 py-3 text-sm text-amber-100/64 shadow-[0_16px_50px_rgba(0,0,0,0.24)]">
+                      <div className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] px-4 py-3 text-sm text-amber-100/64 shadow-[0_16px_50px_rgba(0,0,0,0.24)]">
                         {phase === "retrieving"
                           ? "Consulting scripture..."
                           : `${activePersona.displayName} is reflecting...`}
@@ -1211,7 +1065,7 @@ export function ChatShell({
             <div className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex w-full justify-center pb-4">
               {!isAtBottom && (
                 <button
-                  className="pointer-events-auto rounded-full border border-amber-200/20 bg-[#120c08]/90 px-4 py-2 text-xs font-semibold tracking-wide text-amber-200/80 shadow-[0_4px_12px_rgba(0,0,0,0.5)] backdrop-blur-md transition hover:bg-[#1a110b]"
+                  className="pointer-events-auto rounded-full border border-amber-200/20 bg-[var(--card-surface)] px-4 py-2 text-xs font-semibold tracking-wide text-amber-200/80 shadow-[0_4px_12px_rgba(0,0,0,0.5)] backdrop-blur-md transition hover:bg-[#1a110b]"
                   onClick={() => {
                     messagesEndRef.current?.scrollIntoView({
                       behavior: "smooth",
@@ -1226,7 +1080,7 @@ export function ChatShell({
             </div>
 
             {/* ── Composer / Voice area ── */}
-            <div className="border-t border-amber-200/12 bg-[#080604]/82 p-4 backdrop-blur-xl md:p-6">
+            <div className="border-t border-amber-200/12 bg-[var(--page-surface)] p-4 backdrop-blur-xl md:p-6">
               <div className="mx-auto max-w-4xl">
                 {/* Transcribed text preview */}
                 {transcribedText && phase !== "idle" ? (
@@ -1240,28 +1094,6 @@ export function ChatShell({
                   </div>
                 ) : null}
 
-                {/* Tap-to-play fallback */}
-                {playbackBlocked ? (
-                  <div className="mb-3 flex items-center gap-3 rounded-md border border-amber-300/25 bg-amber-300/8 px-3 py-2">
-                    <p className="flex-1 text-xs text-amber-200/80">
-                      Browser blocked auto-play.
-                    </p>
-                    <button
-                      className="shrink-0 rounded-md border border-amber-300/40 bg-amber-300/12 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20"
-                      onClick={() => {
-                        setPlaybackBlocked(false);
-                        if (audioResponseRef.current) {
-                          void audioResponseRef.current.play();
-                          setPhase("speaking");
-                        }
-                      }}
-                      type="button"
-                    >
-                      ▶ Tap to play response
-                    </button>
-                  </div>
-                ) : null}
-
                 {errorMessage ? (
                   <p
                     className="mb-3 rounded-md border border-red-300/25 bg-red-400/10 px-3 py-2 text-sm text-red-100"
@@ -1269,6 +1101,37 @@ export function ChatShell({
                   >
                     {errorMessage}
                   </p>
+                ) : null}
+
+                {!hasMicConsent ? (
+                  <div className="mb-3 flex items-center gap-3 rounded-md border border-amber-300/25 bg-amber-300/8 px-3 py-2">
+                    <p className="flex-1 text-xs leading-5 text-amber-100/75">
+                      Voice input needs your consent for transient processing by
+                      the local faster-whisper service. Audio is deleted after
+                      transcription.
+                    </p>
+                    <button
+                      className="shrink-0 rounded-md border border-amber-300/40 bg-amber-300/12 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20 disabled:opacity-50"
+                      disabled={isSavingMicConsent}
+                      onClick={() => {
+                        startSavingMicConsent(async () => {
+                          try {
+                            await giveMicrophoneConsentAction();
+                            setHasMicConsent(true);
+                            setErrorMessage(null);
+                            router.refresh();
+                          } catch {
+                            setErrorMessage(
+                              "Could not save microphone consent. Typed input remains available.",
+                            );
+                          }
+                        });
+                      }}
+                      type="button"
+                    >
+                      {isSavingMicConsent ? "Saving..." : "Enable microphone"}
+                    </button>
+                  </div>
                 ) : null}
 
                 {/* Main composer row */}
@@ -1281,17 +1144,22 @@ export function ChatShell({
                     void e;
                   }}
                 >
-                  <div className="flex items-end gap-3 rounded-lg border border-amber-200/14 bg-[#110b08]/92 p-3 shadow-[0_18px_70px_rgba(0,0,0,0.32)]">
+                  <div className="flex items-end gap-3 rounded-lg border border-amber-200/14 bg-[var(--card-surface)] p-3 shadow-[0_18px_70px_rgba(0,0,0,0.32)]">
                     {/* Voice Recorder (primary input) */}
                     <div className="flex shrink-0 flex-col items-center">
                       <VoiceRecorder
                         disabled={!selectedConversation}
+                        hasStoredConsent={hasMicConsent}
                         idleLabel={
                           selectedConversation && visibleMessages.length > 0
                             ? "Tap to ask again"
                             : undefined
                         }
+                        language={
+                          currentUser.languagePreference === "hi" ? "hi" : "en"
+                        }
                         onError={handleVoiceError}
+                        onConsentMissing={() => setPhase("error")}
                         onPermissionRequest={handlePermissionRequest}
                         onRecordingStart={handleRecordingStart}
                         onTranscribing={handleRecordingStop}

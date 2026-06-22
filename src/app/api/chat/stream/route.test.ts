@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => {
     streamGroundedAnswer: vi.fn(),
     validateAnswerCitations: vi.fn(),
     answerCitationCreateMany: vi.fn(),
+    getAIUserFacingMessage: vi.fn(),
   };
 });
 
@@ -64,6 +65,7 @@ vi.mock("@/lib/ai", () => ({
       this.code = code;
     }
   },
+  getAIUserFacingMessage: mocks.getAIUserFacingMessage,
 }));
 
 vi.mock("@/lib/rate-limit", () => ({
@@ -171,6 +173,9 @@ beforeEach(() => {
   mocks.detectCrisisIntent.mockReturnValue(true);
   mocks.crisisSupportMessage.mockReturnValue(
     "Steady yourself and seek immediate support.",
+  );
+  mocks.getAIUserFacingMessage.mockReturnValue(
+    "Local AI is unavailable. Start Ollama and confirm the configured model is installed.",
   );
 });
 
@@ -387,6 +392,30 @@ describe("POST /api/chat/stream authorization", () => {
     );
   });
 
+  it("streams a friendly terminal failure when local Ollama is unavailable", async () => {
+    mocks.detectCrisisIntent.mockReturnValueOnce(false);
+    mocks.streamGroundedAnswer.mockImplementationOnce(async function* () {
+      throw new Error("connect ECONNREFUSED 127.0.0.1:11434");
+    });
+
+    const response = await POST(
+      chatRequest({
+        conversationId: CONVERSATION_ID,
+        message: "What is duty?",
+      }),
+    );
+    const events = await readEvents(response);
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "error",
+        error:
+          "Local AI is unavailable. Start Ollama and confirm the configured model is installed.",
+      }),
+    );
+    expect(events.at(-1)).toMatchObject({ type: "done", status: "failed" });
+  });
+
   it("passes only bounded user-visible conversation history to generation", async () => {
     mocks.detectCrisisIntent.mockReturnValueOnce(false);
     const previousTurns = Array.from({ length: 14 }, (_, index) => ({
@@ -444,7 +473,7 @@ describe("POST /api/chat/stream authorization", () => {
     await readEvents(response);
   });
 
-  it("passes voice interaction mode through to scripture retrieval and message metadata", async () => {
+  it("passes voice mode through without marking an ungrounded answer voice-eligible", async () => {
     mocks.detectCrisisIntent.mockReturnValueOnce(false);
     mocks.streamGroundedAnswer.mockImplementationOnce(async function* () {
       yield { type: "delta", text: "Act with steadiness." };
@@ -456,8 +485,8 @@ describe("POST /api/chat/stream authorization", () => {
           citations: [],
           grounding: { usedRag: false, confidence: 1 },
           metadata: {
-            provider: "openai",
-            model: "gpt-test",
+            provider: "ollama",
+            model: "qwen3:8b",
           },
         },
       };
@@ -485,10 +514,10 @@ describe("POST /api/chat/stream authorization", () => {
       expect.objectContaining({
         metadata: expect.objectContaining({
           interactionMode: "voice",
-          model: "gpt-test",
-          provider: "openai",
+          model: "qwen3:8b",
+          provider: "ollama",
           turnId: "turn-voice",
-          voiceEligible: true,
+          voiceEligible: false,
         }),
       }),
     );

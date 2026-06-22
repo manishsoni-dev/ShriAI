@@ -16,6 +16,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { db } from "../src/lib/db";
 import { scriptureFileSchema } from "../src/lib/rag/scripture-schema";
+import {
+  getManifestSource,
+  isManifestSourceEligible,
+} from "../src/lib/rag/source-manifest";
 
 const args = process.argv.slice(2);
 const isDryRun = args.includes("--dry-run");
@@ -27,47 +31,6 @@ const sourceArg = args.find((a) => a.startsWith("--source="));
 if (sourceArg) {
   sourceFilter = sourceArg.split("=")[1] || null;
 }
-
-// ── Source registry ──────────────────────────────────────────────────────────
-
-type SourceMeta = {
-  canonicalTitle: string;
-  tradition: string;
-  language: string;
-  copyrightStatus: string;
-  priority: number;
-};
-
-const SOURCE_REGISTRY: Record<string, SourceMeta> = {
-  "bhagavad-gita": {
-    canonicalTitle: "Bhagavad Gita",
-    tradition: "Vaishnava",
-    language: "sanskrit",
-    copyrightStatus: "public_domain",
-    priority: 10,
-  },
-  "valmiki-ramayana": {
-    canonicalTitle: "Valmiki Ramayana",
-    tradition: "Vaishnava",
-    language: "sanskrit",
-    copyrightStatus: "public_domain",
-    priority: 10,
-  },
-  ramcharitmanas: {
-    canonicalTitle: "Ramcharitmanas",
-    tradition: "Vaishnava",
-    language: "hindi",
-    copyrightStatus: "public_domain",
-    priority: 9,
-  },
-  "isha-upanishad": {
-    canonicalTitle: "Isha Upanishad",
-    tradition: "Vedanta",
-    language: "sanskrit",
-    copyrightStatus: "public_domain",
-    priority: 10,
-  },
-};
 
 async function main() {
   const dataDir = path.resolve(process.cwd(), "data", "scriptures");
@@ -86,7 +49,7 @@ async function main() {
       const stat = fs.statSync(fullPath);
       if (stat && stat.isDirectory()) {
         results = results.concat(findJsonFiles(fullPath));
-      } else if (file.endsWith(".json")) {
+      } else if (file.endsWith(".json") && file !== "source-manifest.json") {
         results.push(fullPath);
       }
     }
@@ -116,24 +79,29 @@ async function main() {
   console.log(`Found ${files.length} file(s) to process.\n`);
 
   let totalUpserted = 0;
-  let totalSkipped = 0;
+  const totalSkipped = 0;
   let totalErrors = 0;
 
   for (const filePath of files) {
     // derive slug from parent directory or file name
     const dirName = path.basename(path.dirname(filePath));
     const fileName = path.basename(filePath, ".json");
-    // try to match registry
-    let slug = dirName;
-    if (!SOURCE_REGISTRY[slug]) {
-      slug = fileName;
-      if (!SOURCE_REGISTRY[slug]) {
-        console.warn(
-          `  ⚠  ${filePath}: no entry in SOURCE_REGISTRY for ${slug} — skipping`,
-        );
-        totalSkipped++;
-        continue;
-      }
+    const slug = dirName === "scriptures" ? fileName : dirName;
+
+    let manifestSource;
+    try {
+      manifestSource = getManifestSource({ slug });
+    } catch (error) {
+      console.error(`  ✗ ${filePath}: ${String(error)}`);
+      totalErrors++;
+      continue;
+    }
+    if (!isManifestSourceEligible(manifestSource)) {
+      console.error(
+        `  ✗ ${filePath}: manifest rights status ${manifestSource.rightsStatus} is not ingestible`,
+      );
+      totalErrors++;
+      continue;
     }
 
     let rawChunks: unknown;
@@ -155,19 +123,21 @@ async function main() {
     }
 
     const validChunks = validation.data;
-    const sourceMeta = {
-      ...(SOURCE_REGISTRY[slug] ?? {
-        canonicalTitle: validChunks[0]!.source,
-        tradition: "Vaishnava",
-        language: validChunks[0]!.language,
-        copyrightStatus: validChunks[0]!.copyrightStatus,
-        priority: validChunks[0]!.sourcePriority,
-      }),
-      canonicalTitle: validChunks[0]!.source,
-      language: validChunks[0]!.language,
-      copyrightStatus: validChunks[0]!.copyrightStatus,
-      priority: Math.max(...validChunks.map((chunk) => chunk.sourcePriority)),
-    };
+    const sourceMeta = manifestSource;
+
+    if (
+      validChunks.some(
+        (chunk) =>
+          chunk.source !== sourceMeta.canonicalTitle ||
+          chunk.language !== sourceMeta.language,
+      )
+    ) {
+      console.error(
+        `  ✗ ${filePath}: corpus source title/language does not match manifest`,
+      );
+      totalErrors++;
+      continue;
+    }
 
     console.log(`  📖 ${sourceMeta.canonicalTitle} - ${filePath}`);
 
@@ -182,17 +152,23 @@ async function main() {
         duplicatesInFile++;
       } else {
         // Enforce max text sizes to prevent oversized chunks
-        if (chunk.translation.length > 2500 || (chunk.commentary && chunk.commentary.length > 2500)) {
-           console.warn(`     ⚠ Oversized chunk rejected: ${chunk.id}`);
-           failedValidationCount++;
-           continue;
+        if (
+          chunk.translation.length > 2500 ||
+          (chunk.commentary && chunk.commentary.length > 2500)
+        ) {
+          console.warn(`     ⚠ Oversized chunk rejected: ${chunk.id}`);
+          failedValidationCount++;
+          continue;
         }
-        
+
         // Prevent generic templated commentaries or practical notes
-        if (chunk.commentary && chunk.commentary.toLowerCase().includes("lorem ipsum")) {
-           console.warn(`     ⚠ Templated commentary rejected: ${chunk.id}`);
-           failedValidationCount++;
-           continue;
+        if (
+          chunk.commentary &&
+          chunk.commentary.toLowerCase().includes("lorem ipsum")
+        ) {
+          console.warn(`     ⚠ Templated commentary rejected: ${chunk.id}`);
+          failedValidationCount++;
+          continue;
         }
 
         ids.add(chunk.id);
@@ -218,14 +194,30 @@ async function main() {
         canonicalTitle: sourceMeta.canonicalTitle,
         tradition: sourceMeta.tradition,
         language: sourceMeta.language,
-        copyrightStatus: sourceMeta.copyrightStatus,
+        copyrightStatus: sourceMeta.rightsStatus,
+        manifestId: sourceMeta.id,
+        edition: sourceMeta.edition,
+        translator: sourceMeta.translator,
+        license: sourceMeta.license,
+        attribution: sourceMeta.attribution,
+        sourceUrl: sourceMeta.sourceUrl,
+        ingestionDate: new Date(`${sourceMeta.ingestionDate}T00:00:00.000Z`),
         priority: sourceMeta.priority,
+        active: true,
       },
       update: {
         tradition: sourceMeta.tradition,
         language: sourceMeta.language,
-        copyrightStatus: sourceMeta.copyrightStatus,
+        copyrightStatus: sourceMeta.rightsStatus,
+        manifestId: sourceMeta.id,
+        edition: sourceMeta.edition,
+        translator: sourceMeta.translator,
+        license: sourceMeta.license,
+        attribution: sourceMeta.attribution,
+        sourceUrl: sourceMeta.sourceUrl,
+        ingestionDate: new Date(`${sourceMeta.ingestionDate}T00:00:00.000Z`),
         priority: sourceMeta.priority,
+        active: true,
       },
     });
 
@@ -247,6 +239,9 @@ async function main() {
         const data = {
           sourceId: source.id,
           canonicalRef: chunk.canonicalRef,
+          chapter: chunk.chapter,
+          verseStart: chunk.verseStart,
+          verseEnd: chunk.verseEnd,
           language: chunk.language,
           originalText: chunk.originalText ?? null,
           transliteration: chunk.transliteration ?? null,

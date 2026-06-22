@@ -2,10 +2,12 @@
 import "dotenv/config";
 
 import * as fs from "node:fs";
-import Module from "node:module";
+import "./shim-server-only";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 
 import { db } from "../src/lib/db";
+import { validateEvalArtifactIdentity } from "../src/lib/rag/eval-artifact";
 
 type Gate = {
   name: string;
@@ -30,7 +32,12 @@ const REQUIRED_MIGRATIONS = [
   "20260612144500_add_voice_qa_runs",
   "20260612160000_add_needs_changes_review_status",
   "20260612161000_add_scripture_review_workflow_audit",
+  "20260622000000_local_ollama_embeddings",
+  "20260622010000_evidence_first_scripture",
 ];
+
+const CANONICAL_EVAL_FILE = "data/evals/scripture-retrieval/evidence-v2.json";
+const MAX_EVAL_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const releaseEnvironment = process.env.RELEASE_ENVIRONMENT ?? "staging";
 const minVoiceApprovedChunks = Number(
@@ -41,24 +48,6 @@ const minVoiceApprovedPercent = Number(
 );
 const requireCompletedVoiceQa =
   (process.env.RELEASE_REQUIRE_COMPLETED_VOICE_QA ?? "true") !== "false";
-
-function installServerOnlyShimForCli() {
-  const moduleWithLoad = Module as unknown as {
-    _load: (
-      request: string,
-      parent: NodeModule | null | undefined,
-      isMain: boolean,
-    ) => unknown;
-  };
-  const originalLoad = moduleWithLoad._load;
-
-  moduleWithLoad._load = function patchedLoad(request, parent, isMain) {
-    if (request === "server-only") return {};
-    return originalLoad.call(this, request, parent, isMain);
-  };
-}
-
-installServerOnlyShimForCli();
 
 function configured(value: string | undefined) {
   return Boolean(value && value.trim() && !value.includes("replace-with"));
@@ -77,17 +66,21 @@ function latestEvalArtifact() {
 
   const files = fs
     .readdirSync(dir)
-    .filter((file) => file.endsWith(".json"))
-    .sort();
+    .filter((file) => file.startsWith("eval-run-") && file.endsWith(".json"))
+    .map((file) => path.join(dir, file))
+    .sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
 
   const latest = files.at(-1);
-  return latest ? path.join(dir, latest) : null;
+  return latest ?? null;
 }
 
 function evalArtifactPasses(artifact: unknown) {
   const data = artifact as {
+    passed?: boolean;
     thresholds?: Record<string, number>;
-    metrics?: Record<string, number>;
+    metrics?: Record<string, number> & {
+      latency?: { p95TotalTurnMs?: number };
+    };
   };
   const thresholds = data.thresholds ?? {};
   const metrics = data.metrics ?? {};
@@ -104,7 +97,23 @@ function evalArtifactPasses(artifact: unknown) {
     metrics.unsupportedAnswerRate > thresholds.unsupportedAnswerRate
       ? "Unsupported-answer proxy"
       : null,
-    metrics.p95LatencyMs > thresholds.p95LatencyMs ? "p95 latency" : null,
+    metrics.fabricatedCitationRate > thresholds.fabricatedCitationRate
+      ? "Fabricated citations"
+      : null,
+    metrics.abstentionAccuracy < thresholds.abstentionAccuracy
+      ? "Abstention accuracy"
+      : null,
+    metrics.injectionResistance < thresholds.injectionResistance
+      ? "Injection resistance"
+      : null,
+    metrics.crisisRoutingAccuracy < thresholds.crisisRoutingAccuracy
+      ? "Crisis routing"
+      : null,
+    (metrics.latency?.p95TotalTurnMs ?? Number.POSITIVE_INFINITY) >
+    thresholds.p95LatencyMs
+      ? "p95 latency"
+      : null,
+    data.passed !== true ? "Artifact not marked passed" : null,
   ].filter((item): item is string => item !== null);
 
   return {
@@ -202,6 +211,25 @@ async function main() {
       },
     }),
   ]);
+  const invalidSources = await db.scriptureSource.count({
+    where: {
+      active: true,
+      OR: [
+        { manifestId: null },
+        { edition: null },
+        { translator: null },
+        { license: null },
+        { attribution: null },
+        { ingestionDate: null },
+        { copyrightStatus: { notIn: ["public_domain", "licensed"] } },
+      ],
+    },
+  });
+  const invalidVerseChunks = await db.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS "count"
+    FROM "ScriptureChunk"
+    WHERE "chapter" < 1 OR "verseStart" < 1 OR "verseEnd" < "verseStart"
+  `;
   const voiceApprovedPercent =
     totalChunks === 0 ? 0 : (voiceApproved / totalChunks) * 100;
 
@@ -210,6 +238,13 @@ async function main() {
       "Scripture corpus",
       totalChunks > 0 && reviewCount >= totalChunks,
       `${totalChunks} chunks, ${reviewCount} review rows.`,
+    ),
+  );
+  gates.push(
+    gate(
+      "Source provenance",
+      invalidSources === 0 && Number(invalidVerseChunks[0]?.count ?? 0) === 0,
+      `${invalidSources} invalid sources, ${Number(invalidVerseChunks[0]?.count ?? 0)} invalid verse ranges.`,
     ),
   );
   gates.push(
@@ -233,16 +268,89 @@ async function main() {
   } else {
     const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf-8"));
     const result = evalArtifactPasses(artifact);
-    gates.push(
-      gate(
-        "Latest retrieval eval",
-        result.passed,
-        result.passed
-          ? `${path.relative(process.cwd(), artifactPath)} passed (${result.cases} cases).`
-          : `Failed: ${result.failures.join(", ")}`,
-      ),
-    );
+
+    // Stale eval artifacts check
+    const { getActiveExperimentConfig } =
+      await import("../src/lib/rag/experiment-config");
+    const activeConfig = getActiveExperimentConfig();
+    const canonicalEvalPath = path.resolve(process.cwd(), CANONICAL_EVAL_FILE);
+    const canonicalDatasetHash = fs.existsSync(canonicalEvalPath)
+      ? createHash("sha256")
+          .update(fs.readFileSync(canonicalEvalPath))
+          .digest("hex")
+      : null;
+    const staleReasons = validateEvalArtifactIdentity({
+      artifact,
+      canonicalDatasetHash,
+      canonicalEvalFile: CANONICAL_EVAL_FILE,
+      activeExperimentConfig: activeConfig,
+      maxAgeMs: MAX_EVAL_AGE_MS,
+      minimumCases: 30,
+    });
+    if (staleReasons.length > 0) {
+      gates.push(
+        gate(
+          "Latest retrieval eval",
+          false,
+          `Stale or noncanonical: ${staleReasons.join(", ")}.`,
+        ),
+      );
+    } else {
+      gates.push(
+        gate(
+          "Latest retrieval eval",
+          result.passed,
+          result.passed
+            ? `${path.relative(process.cwd(), artifactPath)} passed (${result.cases} cases).`
+            : `Failed: ${result.failures.join(", ")}`,
+        ),
+      );
+    }
   }
+
+  // Mixed models check
+  const embeddingModels = await db.$queryRaw<{ embeddingModel: string }[]>`
+    SELECT DISTINCT "embeddingModel"
+    FROM "ScriptureChunk"
+    WHERE "embedding" IS NOT NULL
+  `;
+  const { getActiveExperimentConfig } =
+    await import("../src/lib/rag/experiment-config");
+  const activeConfig = getActiveExperimentConfig();
+
+  const isUniform = embeddingModels.length === 1;
+  const dbModel = isUniform ? embeddingModels[0].embeddingModel : null;
+  const matchesActive = dbModel === activeConfig.embeddingModel;
+
+  gates.push(
+    gate(
+      "Embedding uniformity",
+      isUniform && matchesActive,
+      !isUniform
+        ? `Mixed or missing embedding models: ${embeddingModels.map((m) => m.embeddingModel).join(", ")}`
+        : !matchesActive
+          ? `DB model (${dbModel}) does not match active config (${activeConfig.embeddingModel})`
+          : `Uniform embedding model: ${dbModel}`,
+    ),
+  );
+
+  // Automated provenance check
+  const fakeVoiceApprovals = await db.scriptureChunkReview.count({
+    where: {
+      reviewStatus: "approved",
+      approvedForVoice: true,
+      reviewOrigin: { not: "human" },
+    },
+  });
+  gates.push(
+    gate(
+      "Review provenance",
+      fakeVoiceApprovals === 0,
+      fakeVoiceApprovals === 0
+        ? "All voice approvals are human-origin."
+        : `${fakeVoiceApprovals} voice approvals lack human provenance.`,
+    ),
+  );
 
   const { retrieveScriptureContext } =
     await import("../src/lib/rag/scripture-retrieval");
@@ -321,29 +429,6 @@ async function main() {
     configured(process.env.REVIEWER_EMAILS)
       ? null
       : "ADMIN_EMAILS or REVIEWER_EMAILS",
-    releaseEnvironment === "production" &&
-    !configured(process.env.OPENAI_API_KEY)
-      ? "OPENAI_API_KEY"
-      : null,
-    releaseEnvironment === "production" &&
-    process.env.STT_PROVIDER === "deepgram" &&
-    !configured(process.env.DEEPGRAM_API_KEY)
-      ? "DEEPGRAM_API_KEY"
-      : null,
-    releaseEnvironment === "production" &&
-    process.env.STT_PROVIDER === "google" &&
-    !configured(process.env.GOOGLE_API_KEY)
-      ? "GOOGLE_API_KEY"
-      : null,
-    releaseEnvironment === "production" &&
-    (process.env.STT_PROVIDER ?? "openai") === "openai" &&
-    !configured(process.env.OPENAI_API_KEY)
-      ? "OPENAI_API_KEY"
-      : null,
-    releaseEnvironment === "production" &&
-    !configured(process.env.ELEVENLABS_API_KEY)
-      ? "ELEVENLABS_API_KEY"
-      : null,
   ].filter((item): item is string => item !== null);
 
   gates.push(

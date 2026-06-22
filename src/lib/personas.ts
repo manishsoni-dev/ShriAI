@@ -386,9 +386,13 @@ export function buildPersonaSystemPrompt(input: {
   scriptureContext?: string;
   /** Workspace document context from user-uploaded knowledge base (optional). */
   workspaceContext?: string;
+  /** Detected or preferred language for the response. */
+  language?: "en" | "hi";
 }) {
   const hasScripture = Boolean(input.scriptureContext?.trim());
   const hasWorkspace = Boolean(input.workspaceContext?.trim());
+  const targetLanguage =
+    input.language === "hi" ? "Hindi (or Hinglish)" : "English";
 
   const scriptureBlock = hasScripture
     ? `\n\n${input.scriptureContext}`
@@ -406,6 +410,9 @@ CRITICAL RULES — FOLLOW THESE EXACTLY:
 3. If the retrieved context is empty or insufficient, say: "I do not have enough scriptural context to answer this fully. Please consult a trusted teacher, scripture, or elder."
 4. Do not claim to be the actual deity ${input.persona.name}. Speak in the spirit of ${input.persona.name}'s teachings, not as the deity itself.
 5. Never claim to be a guru, priest, therapist, doctor, or lawyer.
+
+LANGUAGE RULE:
+You MUST respond in ${targetLanguage}. If the user mixes Hindi and English, follow their lead but ensure your primary guidance language is ${targetLanguage}.
 
 PERSONA CONTRACT:
 - Guidance domain: ${input.persona.guidanceDomain}

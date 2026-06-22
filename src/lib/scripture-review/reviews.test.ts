@@ -63,6 +63,10 @@ describe("mutateScriptureReview", () => {
       name: "Reviewer",
       passwordHash: "x",
       imageUrl: null,
+      languagePreference: "auto",
+      microphoneConsentGivenAt: null,
+      microphoneConsentVersion: null,
+      onboardedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -97,6 +101,10 @@ describe("mutateScriptureReview", () => {
       name: "Random User",
       passwordHash: "x",
       imageUrl: null,
+      languagePreference: "auto",
+      microphoneConsentGivenAt: null,
+      microphoneConsentVersion: null,
+      onboardedAt: null,
       createdAt: new Date(),
       updatedAt: new Date(),
     });

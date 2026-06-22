@@ -4,11 +4,11 @@ import * as readline from "node:readline";
 
 const rl = readline.createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
 function askQuestion(query: string): Promise<string> {
-  return new Promise(resolve => rl.question(query, resolve));
+  return new Promise((resolve) => rl.question(query, resolve));
 }
 
 async function main() {
@@ -25,56 +25,62 @@ async function main() {
         email: "reviewer@shri-ai.com",
         name: "CLI Reviewer",
         passwordHash: "dummy",
-      }
+      },
     });
   }
 
   const chunksToReview = await db.scriptureChunk.findMany({
     where: {
       source: {
-        canonicalTitle: sourceTitle
+        canonicalTitle: sourceTitle,
       },
       OR: [
         { reviews: { none: {} } },
-        { reviews: { some: { reviewStatus: "pending" } } }
-      ]
+        { reviews: { some: { reviewStatus: "pending" } } },
+      ],
     },
     include: {
-      reviews: true
+      reviews: true,
     },
     orderBy: {
-      canonicalRef: 'asc'
-    }
+      canonicalRef: "asc",
+    },
   });
 
-  console.log(`Found ${chunksToReview.length} pending chunks to review for ${sourceTitle}.`);
+  console.log(
+    `Found ${chunksToReview.length} pending chunks to review for ${sourceTitle}.`,
+  );
 
   let approved = 0;
   let rejected = 0;
   let skipped = 0;
 
   for (const chunk of chunksToReview) {
-    console.log(`\n────────────────────────────────────────────────────────────`);
+    console.log(
+      `\n────────────────────────────────────────────────────────────`,
+    );
     console.log(`Chunk: ${sourceTitle} ${chunk.canonicalRef}`);
     console.log(`Translation: ${chunk.translation}`);
     if (chunk.commentary) console.log(`Commentary: ${chunk.commentary}`);
     console.log(`────────────────────────────────────────────────────────────`);
-    
-    const answer = await askQuestion(`Approve this chunk for voice? (y/n/s to skip/q to quit): `);
+
+    const answer = await askQuestion(
+      `Approve this chunk for voice? (y/n/s to skip/q to quit): `,
+    );
     const action = answer.trim().toLowerCase();
 
-    if (action === 'q') {
+    if (action === "q") {
       console.log("Quitting review session.");
       break;
     }
 
-    if (action === 's') {
+    if (action === "s") {
       console.log("Skipped.");
       skipped++;
       continue;
     }
 
-    const isApproved = action === 'y';
+    const isApproved = action === "y";
     const nextStatus = isApproved ? "approved" : "rejected";
     let review = chunk.reviews?.[0];
 
@@ -89,8 +95,8 @@ async function main() {
             reviewedAt: new Date(),
             accuracyScore: isApproved ? 5 : 1,
             interpretationNotes: `Manually reviewed via interactive CLI. Action: ${nextStatus}.`,
-            reviewOrigin: "human"
-          }
+            reviewOrigin: "human",
+          },
         });
       } else {
         await tx.scriptureChunkReview.update({
@@ -102,8 +108,8 @@ async function main() {
             reviewedAt: new Date(),
             accuracyScore: isApproved ? 5 : 1,
             interpretationNotes: `Manually reviewed via interactive CLI. Action: ${nextStatus}.`,
-            reviewOrigin: "human"
-          }
+            reviewOrigin: "human",
+          },
         });
       }
 
@@ -116,8 +122,8 @@ async function main() {
           previousApprovedForVoice: false,
           nextApprovedForVoice: isApproved,
           reviewerUserId: user.id,
-          notes: `Interactive CLI review decision: ${nextStatus}`
-        }
+          notes: `Interactive CLI review decision: ${nextStatus}`,
+        },
       });
     });
 
@@ -130,11 +136,15 @@ async function main() {
     }
   }
 
-  console.log(`\nReview session complete. Approved: ${approved}, Rejected: ${rejected}, Skipped: ${skipped}`);
+  console.log(
+    `\nReview session complete. Approved: ${approved}, Rejected: ${rejected}, Skipped: ${skipped}`,
+  );
   rl.close();
 }
 
-main().catch(err => {
-  console.error("Error:", err);
-  rl.close();
-}).finally(() => db.$disconnect());
+main()
+  .catch((err) => {
+    console.error("Error:", err);
+    rl.close();
+  })
+  .finally(() => db.$disconnect());

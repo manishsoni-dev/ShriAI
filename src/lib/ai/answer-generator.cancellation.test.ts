@@ -32,7 +32,7 @@ describe("streamGroundedAnswer - Deterministic Cancellation", () => {
     vi.clearAllMocks();
   });
 
-  it("aborts delayed chunk emission cleanly when signal is aborted mid-stream", async () => {
+  it("aborts before any unvalidated model text is emitted", async () => {
     const controller = new AbortController();
     let yieldedChunks = 0;
 
@@ -81,7 +81,7 @@ describe("streamGroundedAnswer - Deterministic Cancellation", () => {
     expect(yieldedChunks).toBeGreaterThan(0);
     expect(yieldedChunks).toBeLessThan(4);
 
-    // Verify the chunks that did make it through were collected
-    expect(events.length).toBeGreaterThan(0);
+    // Citation-first buffering prevents partial, unvalidated prose from leaking.
+    expect(events).toEqual([]);
   });
 });

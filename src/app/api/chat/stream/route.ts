@@ -8,7 +8,7 @@ import { type AIMessage } from "@/lib/ai/types";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { AIError } from "@/lib/ai";
+import { getAIUserFacingMessage } from "@/lib/ai";
 import {
   ConversationAccessError,
   createMessage,
@@ -375,6 +375,7 @@ export async function POST(request: Request) {
 
     if (detectCrisisIntent(content)) {
       const answer = crisisSupportMessage();
+      const voiceEligible = interactionMode === "voice";
       const assistantMessage = await createMessage({
         userId: user.id,
         conversationId: conversation.id,
@@ -389,7 +390,7 @@ export async function POST(request: Request) {
           spokenAnswer: answer,
           traceId,
           turnId,
-          voiceEligible: interactionMode === "voice",
+          voiceEligible,
         },
       });
 
@@ -447,6 +448,7 @@ export async function POST(request: Request) {
                 type: "assistant-message",
                 message: serializeMessage(assistantMessage),
                 spokenAnswer: answer,
+                voiceEligible,
                 citations: [],
                 traceId,
                 turnId,
@@ -527,6 +529,8 @@ export async function POST(request: Request) {
             insufficientContext: ragResult?.insufficientContext ?? false,
             insufficientApprovedContext:
               ragResult?.insufficientApprovedContext ?? false,
+            evidence: ragResult?.evidence,
+            retrievedChunks: ragResult?.chunks ?? [],
             history,
             usageContext: {
               userId: user.id,
@@ -595,6 +599,10 @@ export async function POST(request: Request) {
             throw new Error("Generated answer contained invalid citations.");
           }
 
+          const voiceEligible =
+            interactionMode === "voice" &&
+            finalAnswer.grounding.usedRag &&
+            finalAnswer.citations.length > 0;
           const assistantMessage = await createMessage({
             userId: user.id,
             conversationId: conversation.id,
@@ -604,6 +612,13 @@ export async function POST(request: Request) {
               provider: finalAnswer.metadata?.provider ?? "ai-gateway",
               model: finalAnswer.metadata?.model ?? "configured-chat-model",
               grounding: finalAnswer.grounding,
+              answer: finalAnswer.answer,
+              citations: finalAnswer.citations,
+              confidence: finalAnswer.confidence,
+              abstained: finalAnswer.abstained,
+              safetyNote: finalAnswer.safetyNote,
+              uncertainty: finalAnswer.uncertainty,
+              evidence: ragResult?.evidence,
               interactionMode,
               personaId: persona.id,
               retrievalMode: ragResult?.mode ?? interactionMode,
@@ -611,7 +626,7 @@ export async function POST(request: Request) {
               status: "completed",
               traceId,
               turnId,
-              voiceEligible: interactionMode === "voice",
+              voiceEligible,
             },
           });
 
@@ -645,6 +660,13 @@ export async function POST(request: Request) {
                 id: chunk.id,
                 canonicalRef: chunk.canonicalRef,
                 sourceTitle: chunk.sourceTitle,
+                chapter: chunk.chapter,
+                verseStart: chunk.verseStart,
+                verseEnd: chunk.verseEnd,
+                edition: chunk.sourceEdition,
+                translator: chunk.sourceTranslator,
+                attribution: chunk.sourceAttribution,
+                sourceUrl: chunk.sourceUrl,
                 score: chunk.score,
                 similarityScore: chunk.vectorScore,
                 keywordRank: chunk.keywordRank,
@@ -652,6 +674,8 @@ export async function POST(request: Request) {
               })),
               finalCitations: finalAnswer.citations,
               grounding: finalAnswer.grounding,
+              uncertainty: finalAnswer.uncertainty,
+              evidence: ragResult?.evidence,
               provider: finalAnswer.metadata?.provider,
               requestId: finalAnswer.metadata?.requestId,
               tokenUsage: finalAnswer.metadata?.usage,
@@ -666,6 +690,7 @@ export async function POST(request: Request) {
                 type: "assistant-message",
                 message: serializeMessage(assistantMessage),
                 spokenAnswer: finalAnswer.spokenAnswer,
+                voiceEligible,
                 citations: finalAnswer.citations,
                 traceId,
                 turnId,
@@ -694,10 +719,7 @@ export async function POST(request: Request) {
             return;
           }
 
-          const message =
-            error instanceof AIError
-              ? `${error.code}: ${error.message}`
-              : "The assistant response failed. Please try again.";
+          const message = getAIUserFacingMessage(error);
 
           void logObservabilityEvent({
             traceId,

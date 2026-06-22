@@ -22,7 +22,7 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/ai", () => ({
   aiProvider: {
     embedText: vi.fn().mockResolvedValue({
-      embedding: new Array(1536).fill(0.1),
+      embedding: new Array(1024).fill(0.1),
     }),
   },
 }));
@@ -44,7 +44,14 @@ import {
 const mockGitaChunk = {
   id: "chunk-gita-247",
   canonicalRef: "2.47",
+  chapter: 2,
+  verseStart: 47,
+  verseEnd: 47,
   sourceTitle: "Bhagavad Gita",
+  sourceEdition: "Bhagavad-Gita, 4th edition (1922)",
+  sourceTranslator: "Annie Wood Besant",
+  sourceAttribution: "Annie Besant, Bhagavad-Gita (1922).",
+  sourceUrl: "https://en.wikisource.org/wiki/Bhagavad-Gita_(Besant_4th)",
   sourcePriority: 10,
   translation:
     "You have a right to perform your duties, but not to the fruits of those actions.",
@@ -59,7 +66,14 @@ const mockGitaChunk = {
 const mockShivaChunk = {
   id: "chunk-shiva-1",
   canonicalRef: "1.1",
+  chapter: 1,
+  verseStart: 1,
+  verseEnd: 1,
   sourceTitle: "Shiva Purana",
+  sourceEdition: null,
+  sourceTranslator: null,
+  sourceAttribution: null,
+  sourceUrl: null,
   sourcePriority: 8,
   translation: "In the beginning, Shiva was alone in the formless void.",
   commentary: "The primordial state before creation.",
@@ -67,6 +81,13 @@ const mockShivaChunk = {
   personaTags: ["shiva"],
   themeTags: ["creation", "silence", "void"],
   score: 0.85,
+};
+
+const strongEvidence = {
+  score: 0.91,
+  level: "strong" as const,
+  threshold: 0.55,
+  reason: "Approved retrieved passages provide strong support.",
 };
 
 // Variant that returns 2 chunks to avoid triggering fallback
@@ -278,6 +299,50 @@ describe("retrieveScriptureContext", () => {
     expect(result.chunks.length).toBeLessThanOrEqual(3);
   });
 
+  it("abstains when approved candidates do not meet the answer threshold", async () => {
+    const weakChunk = {
+      ...mockGitaChunk,
+      sourcePriority: 1,
+      score: 0.2,
+    };
+    (db.$queryRaw as Mock)
+      .mockResolvedValueOnce([weakChunk, { ...weakChunk, id: "weak-2" }])
+      .mockResolvedValueOnce([]);
+    (db.$queryRawUnsafe as Mock).mockResolvedValueOnce([]);
+
+    const result = await retrieveScriptureContext({
+      query: "unrelated question",
+      personaId: "krishna",
+    });
+
+    expect(result.chunks).toHaveLength(0);
+    expect(result.insufficientContext).toBe(true);
+    expect(result.evidence.level).toBe("insufficient");
+    expect(result.evidence.threshold).toBe(0.55);
+  });
+
+  it("marks marginal approved evidence as limited", async () => {
+    const marginalChunk = {
+      ...mockGitaChunk,
+      sourcePriority: 1,
+      score: 0.7,
+    };
+    (db.$queryRaw as Mock).mockResolvedValueOnce([
+      marginalChunk,
+      { ...marginalChunk, id: "marginal-2" },
+    ]);
+    (db.$queryRawUnsafe as Mock).mockResolvedValueOnce([]);
+
+    const result = await retrieveScriptureContext({
+      query: "partially related question",
+      personaId: "krishna",
+    });
+
+    expect(result.chunks).toHaveLength(1);
+    expect(result.evidence.level).toBe("limited");
+    expect(result.evidence.score).toBeCloseTo(0.71);
+  });
+
   it("uses review and source eligibility filters in voice mode", async () => {
     (db.$queryRaw as Mock).mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     (db.$queryRawUnsafe as Mock).mockResolvedValueOnce([]);
@@ -324,6 +389,7 @@ describe("formatScriptureContextForPrompt", () => {
       usedFallback: false,
       insufficientContext: true,
       insufficientApprovedContext: false,
+      evidence: { ...strongEvidence, score: 0, level: "insufficient" },
     });
     expect(result).toBe("");
   });
@@ -343,6 +409,7 @@ describe("formatScriptureContextForPrompt", () => {
       usedFallback: false,
       insufficientContext: false,
       insufficientApprovedContext: false,
+      evidence: strongEvidence,
     });
 
     expect(result).toContain("[1] Bhagavad Gita 2.47");
@@ -359,6 +426,7 @@ describe("formatScriptureContextForPrompt", () => {
       usedFallback: false,
       insufficientContext: false,
       insufficientApprovedContext: false,
+      evidence: strongEvidence,
     });
 
     expect(result).toContain("Commentary:");
@@ -374,6 +442,7 @@ describe("formatScriptureContextForPrompt", () => {
       usedFallback: false,
       insufficientContext: false,
       insufficientApprovedContext: false,
+      evidence: strongEvidence,
     });
 
     expect(result).toContain("Application:");
