@@ -2,7 +2,7 @@
 /**
  * scripts/embed-scriptures.ts
  *
- * Generates OpenAI embeddings for all ScriptureChunk records that have no
+ * Generates local Ollama embeddings for ScriptureChunk records that have no
  * embedding yet (or where --force flag is passed).
  *
  * Usage:
@@ -14,8 +14,9 @@
  */
 
 import "dotenv/config";
+import "./shim-server-only";
 import { db } from "../src/lib/db";
-import OpenAI from "openai";
+import type { EmbeddingProvider } from "../src/lib/ai/types";
 
 const args = process.argv.slice(2);
 const isForce = args.includes("--force");
@@ -33,16 +34,12 @@ if (sourceArg) {
   sourceFilter = sourceArg.split("=")[1];
 }
 
-// ── OpenAI setup ─────────────────────────────────────────────────────────────
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const EMBEDDING_MODEL =
-  process.env.AI_EMBEDDING_MODEL ?? "text-embedding-3-small";
+  process.env.SHRI_AI_EMBEDDING_MODEL ?? "qwen3-embedding:0.6b";
 const EMBEDDING_DIMENSIONS = Number(
-  process.env.AI_EMBEDDING_DIMENSIONS ?? 1536,
+  process.env.SHRI_AI_EMBEDDING_DIMENSIONS ?? 1024,
 );
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY || "dummy" });
+let embedder: EmbeddingProvider;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -80,12 +77,11 @@ async function embedText(text: string): Promise<number[]> {
   if (isDryRun) {
     return Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.01);
   }
-  const response = await openai.embeddings.create({
+  const response = await embedder.embedText({
+    text,
     model: EMBEDDING_MODEL,
-    input: text,
-    dimensions: EMBEDDING_DIMENSIONS,
   });
-  return response.data[0]?.embedding ?? [];
+  return response.embedding;
 }
 
 async function setChunkEmbedding(chunkId: string, embedding: number[]) {
@@ -94,6 +90,12 @@ async function setChunkEmbedding(chunkId: string, embedding: number[]) {
   await db.$executeRaw`
     UPDATE "ScriptureChunk"
     SET "embedding" = ${vector}::vector,
+        "embeddingProvider" = 'ollama',
+        "embeddingModel" = ${EMBEDDING_MODEL},
+        "embeddingDimensions" = ${EMBEDDING_DIMENSIONS},
+        "embeddingVersion" = 'local-ollama-v1',
+        "embeddingGeneratedAt" = NOW(),
+        "embeddingNormalized" = true,
         "updatedAt" = NOW()
     WHERE "id" = ${chunkId}
   `;
@@ -127,6 +129,9 @@ async function withRetry<T>(
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
+  const { LocalEmbeddingProvider } =
+    await import("../src/lib/ai/local-embedding-provider");
+  embedder = new LocalEmbeddingProvider();
   console.log(
     `\nShri AI — Scripture Embeddings${isDryRun ? " (DRY RUN)" : ""}`,
   );
@@ -171,14 +176,6 @@ async function main() {
     console.log("✓ No chunks found needing embeddings. Nothing to do.");
     console.log("  Use --force to re-embed all chunks.\n");
     return;
-  }
-
-  if (!OPENAI_API_KEY && !isDryRun) {
-    console.error(
-      "✗ OPENAI_API_KEY is not set. Embeddings cannot be generated.",
-    );
-    console.error("  Set it in .env.local or export it in your shell.");
-    process.exit(1);
   }
 
   // Fetch full details for those chunks via Prisma findMany

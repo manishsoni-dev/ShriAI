@@ -19,12 +19,18 @@ type IngestDocumentInput = {
 async function setChunkEmbedding(input: {
   chunkId: string;
   embedding: number[];
+  provider: string;
+  model: string;
 }) {
   const vector = toPgVectorLiteral(input.embedding);
 
   await db.$executeRaw`
     UPDATE "DocumentChunk"
-    SET "embedding" = ${vector}::vector
+    SET "embedding" = ${vector}::vector,
+        "embeddingProvider" = ${input.provider},
+        "embeddingModel" = ${input.model},
+        "embeddingDimensions" = ${input.embedding.length},
+        "embeddingGeneratedAt" = NOW()
     WHERE "id" = ${input.chunkId}
   `;
 }
@@ -104,6 +110,8 @@ export async function ingestDocument(input: IngestDocumentInput) {
       await setChunkEmbedding({
         chunkId: createdChunk.id,
         embedding: embedding.embedding,
+        provider: embedding.provider,
+        model: embedding.model,
       });
     }
 

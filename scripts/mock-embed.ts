@@ -5,12 +5,15 @@ async function main() {
   const ishaChunks = await db.scriptureChunk.findMany({
     where: {
       source: {
-        canonicalTitle: "Isha Upanishad"
-      }
-    }
+        canonicalTitle: "Isha Upanishad",
+      },
+    },
   });
 
-  const dummyEmbedding = Array.from({ length: 1536 }, () => Math.random() * 0.02 - 0.01);
+  const dummyEmbedding = Array.from(
+    { length: 1024 },
+    () => Math.random() * 0.02 - 0.01,
+  );
   const vector = `[${dummyEmbedding.map((v) => Number(v).toFixed(8)).join(",")}]`;
 
   for (const chunk of ishaChunks) {
@@ -22,7 +25,7 @@ async function main() {
     `;
     console.log(`Mock-embedded ${chunk.id}`);
   }
-  
+
   console.log("Mock embedding complete.");
 }
 

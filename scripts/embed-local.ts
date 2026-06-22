@@ -1,33 +1,51 @@
 #!/usr/bin/env tsx
 import "dotenv/config";
+import "./shim-server-only";
+
 import { db } from "../src/lib/db";
-import { pipeline } from "@xenova/transformers";
+import { toPgVectorLiteral } from "../src/lib/ingestion/vector";
 
-const EMBEDDING_DIMENSIONS = 1536;
+const MODEL = process.env.SHRI_AI_EMBEDDING_MODEL ?? "qwen3-embedding:0.6b";
+const DIMENSIONS = Number(process.env.SHRI_AI_EMBEDDING_DIMENSIONS ?? 1024);
 
-function toPgVectorLiteral(embedding: number[]) {
-  return `[${embedding.map((v) => Number(v).toFixed(8)).join(",")}]`;
-}
-
-function buildEmbeddingText(chunk: any): string {
-  const parts = [
+function buildEmbeddingText(chunk: {
+  canonicalRef: string;
+  translation: string;
+  commentary: string | null;
+  practicalNote: string | null;
+  themeTags: string[];
+  emotionTags: string[];
+  answerUseCases: string[];
+}) {
+  return [
     `Reference: ${chunk.canonicalRef}`,
     chunk.translation,
-    chunk.commentary ?? "",
-    chunk.practicalNote ?? "",
-    chunk.themeTags.length > 0 ? `Themes: ${chunk.themeTags.join(", ")}` : "",
-    chunk.emotionTags.length > 0 ? `Emotions: ${chunk.emotionTags.join(", ")}` : "",
-    chunk.answerUseCases.length > 0 ? `Use Cases: ${chunk.answerUseCases.join(", ")}` : "",
-  ].filter(Boolean);
-
-  return parts.join("\n\n");
+    chunk.commentary,
+    chunk.practicalNote,
+    chunk.themeTags.length ? `Themes: ${chunk.themeTags.join(", ")}` : null,
+    chunk.emotionTags.length
+      ? `Emotions: ${chunk.emotionTags.join(", ")}`
+      : null,
+    chunk.answerUseCases.length
+      ? `Use cases: ${chunk.answerUseCases.join(", ")}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 async function main() {
-  console.log("Loading local Xenova/all-MiniLM-L6-v2 transformer pipeline...");
-  const extractor = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-
+  const { LocalEmbeddingProvider } =
+    await import("../src/lib/ai/local-embedding-provider");
+  const provider = new LocalEmbeddingProvider();
   const chunks = await db.scriptureChunk.findMany({
+    where: {
+      OR: [
+        { embeddingModel: { not: MODEL } },
+        { embeddingDimensions: { not: DIMENSIONS } },
+        { embeddingGeneratedAt: null },
+      ],
+    },
     select: {
       id: true,
       canonicalRef: true,
@@ -38,40 +56,39 @@ async function main() {
       emotionTags: true,
       answerUseCases: true,
     },
+    orderBy: { createdAt: "asc" },
   });
 
-  console.log(`Generating local embeddings for ${chunks.length} chunks...`);
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    const text = buildEmbeddingText(chunk);
-    
-    const output = await extractor(text, { pooling: "mean", normalize: true });
-    
-    // Extractor outputs Float32Array of length 384
-    const baseVector = Array.from(output.data);
-    
-    // Pad to 1536 dimensions
-    const paddedVector = new Array(EMBEDDING_DIMENSIONS).fill(0);
-    for (let j = 0; j < baseVector.length; j++) {
-      paddedVector[j] = baseVector[j];
+  console.log(`Embedding ${chunks.length} scripture chunks with ${MODEL}.`);
+  for (const [index, chunk] of chunks.entries()) {
+    const result = await provider.embedText({
+      text: buildEmbeddingText(chunk),
+    });
+    if (result.embedding.length !== DIMENSIONS) {
+      throw new Error(
+        `Expected ${DIMENSIONS} dimensions, received ${result.embedding.length}.`,
+      );
     }
-    
-    const vectorLiteral = toPgVectorLiteral(paddedVector);
-
+    const vector = toPgVectorLiteral(result.embedding);
     await db.$executeRaw`
       UPDATE "ScriptureChunk"
-      SET "embedding" = ${vectorLiteral}::vector,
+      SET "embedding" = ${vector}::vector,
+          "embeddingProvider" = 'ollama',
+          "embeddingModel" = ${MODEL},
+          "embeddingDimensions" = ${DIMENSIONS},
+          "embeddingVersion" = 'local-ollama-v1',
+          "embeddingGeneratedAt" = NOW(),
+          "embeddingNormalized" = true,
           "updatedAt" = NOW()
       WHERE "id" = ${chunk.id}
     `;
-
-    if (i % 50 === 0) {
-      console.log(`Processed ${i}/${chunks.length} chunks`);
-    }
+    console.log(`[${index + 1}/${chunks.length}] ${chunk.canonicalRef}`);
   }
-
-  console.log("Local embeddings generation complete!");
 }
 
-main().catch(console.error).finally(() => db.$disconnect());
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => db.$disconnect());

@@ -1,21 +1,21 @@
-export type TaskType = "fallback" | "grounded" | "chat";
+export type TaskType =
+  | "classification"
+  | "reflection"
+  | "grounded"
+  | "fallback"
+  | "citation_validation"
+  | "high_safety"
+  | "chat";
 
 /**
  * Returns the recommended model based on the task type.
  * Ensures we use higher capacity models for complex reasoning
  * and lower capacity models for fallbacks or simple interactions.
+ *
+ * The server MUST control routing. Do not let the client select arbitrary models.
  */
 export function routeTaskToModel(taskType: TaskType): string {
-  // We can pull these from environment variables in the future
-  const highCapacityModel = process.env.AI_ROUTER_HIGH_CAPACITY ?? "gpt-4o";
-  const lowCapacityModel = process.env.AI_ROUTER_LOW_CAPACITY ?? "gpt-4o-mini";
-
-  switch (taskType) {
-    case "fallback":
-    case "chat":
-      return lowCapacityModel;
-    case "grounded":
-    default:
-      return highCapacityModel;
-  }
+  void taskType;
+  return aiModelConfig.chatModel;
 }
+import { aiModelConfig } from "@/lib/ai/config";

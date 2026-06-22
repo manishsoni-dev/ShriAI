@@ -17,8 +17,34 @@ model User {
   usageEvents       UsageEvent[]
   feedbacks         UserFeedback[]
   uploadedDocuments Document[]        @relation("DocumentUploadedBy")
+  languagePreference       String              @default("auto")
+  microphoneConsentGivenAt DateTime?
+  microphoneConsentVersion String?
+  onboardedAt              DateTime?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  betaInvite               BetaInvite?         @relation("UserBetaInvite")
+  sentInvites              BetaInvite[]        @relation("Inviter")
+  supportTickets           BetaSupportTicket[]
+}
+
+model BetaInvite {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  inviterId  String?
+  status     String    @default("pending") // pending, accepted, revoked, expired
+  expiresAt  DateTime?
+  acceptedAt DateTime?
+  userId     String?   @unique
+
+  user    User? @relation("UserBetaInvite", fields: [userId], references: [id])
+  inviter User? @relation("Inviter", fields: [inviterId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
 }
 
 model Workspace {
@@ -256,7 +282,11 @@ model DocumentChunk {
   chunkIndex  Int
   content     String
   metadata    Json?
-  embedding   Unsupported("vector(1536)")?
+  embedding            Unsupported("vector(1024)")?
+  embeddingProvider    String?
+  embeddingModel       String?
+  embeddingDimensions  Int?
+  embeddingGeneratedAt DateTime?
   document    Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
   workspace   Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdAt   DateTime                     @default(now())
@@ -281,6 +311,13 @@ model ScriptureSource {
   language        String           @default("sanskrit")
   /// "public_domain", "licensed", "fair_use"
   copyrightStatus String           @default("public_domain")
+  manifestId      String?          @unique
+  edition         String?
+  translator      String?
+  license         String?
+  attribution     String?
+  sourceUrl       String?
+  ingestionDate   DateTime?
   /// 1–10 — used to boost retrieval score (10 = highest priority)
   priority        Int              @default(5)
   /// Source-level eligibility switch for production retrieval.
@@ -300,6 +337,9 @@ model ScriptureChunk {
   sourceId        String
   /// Canonical reference string, e.g. "2.47", "Sundara Kanda 1.1"
   canonicalRef    String
+  chapter         Int                          @default(1)
+  verseStart      Int                          @default(1)
+  verseEnd        Int                          @default(1)
   /// Primary language of the originalText field
   language        String                       @default("sanskrit")
   /// Devanagari / original script
@@ -320,8 +360,15 @@ model ScriptureChunk {
   emotionTags     String[]
   /// Use-case labels (e.g. ["career confusion", "dealing with loss"])
   answerUseCases  String[]
-  /// OpenAI embedding of translation + commentary combined
-  embedding       Unsupported("vector(1536)")?
+  /// Local Ollama embedding of translation + commentary combined
+  embedding            Unsupported("vector(1024)")?
+  embeddingProvider    String?
+  embeddingModel       String?
+  embeddingDimensions  Int?
+  embeddingVersion     String?
+  embeddingGeneratedAt DateTime?
+  embeddingCorpusHash  String?
+  embeddingNormalized  Boolean?
   /// PostgreSQL full-text search vector (auto-maintained by DB trigger)
   searchVector    Unsupported("tsvector")?
   source          ScriptureSource              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
@@ -335,6 +382,7 @@ model ScriptureChunk {
   @@index([sourceId])
   @@index([personaTags])
   @@index([themeTags])
+  @@index([chapter, verseStart, verseEnd])
 }
 
 enum ScriptureReviewStatus {
@@ -355,6 +403,7 @@ model ScriptureChunkReview {
   reviewedBy          String?
   reviewedAt          DateTime?
   invalidatedAt       DateTime?
+  invalidationReason  String?
   accuracyScore       Int?
   interpretationNotes String?
   rejectionReason     String?
@@ -431,6 +480,8 @@ enum FeedbackLabel {
   unsafe
   incomplete
   voice_problem
+  pronunciation_problem
+  technical_failure
 }
 
 /// Privacy-safe user feedback on model responses.
@@ -445,16 +496,35 @@ model UserFeedback {
   retrievalConfiguration  String?
   labels                  FeedbackLabel[]
   notes                   String?       // optional free-text
+  triageStatus           String          @default("new") // new, investigating, accepted, fixed, cannot_reproduce, rejected, duplicate
 
   user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   conversation            Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   message                 Message       @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   createdAt               DateTime      @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([conversationId])
   @@index([messageId])
-  @@index([createdAt])
 }
 
+model BetaSupportTicket {
+  id              String   @id @default(cuid())
+  userId          String
+  issueCategory   String
+  traceId         String?
+  timestamp       DateTime @default(now())
+  browser         String?
+  os              String?
+  deviceClass     String?
+  persona         String?
+  interactionMode String?
+  description     String
+  status          String   @default("open") // open, investigating, resolved, closed
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

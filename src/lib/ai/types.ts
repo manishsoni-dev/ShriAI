@@ -30,6 +30,7 @@ export type GenerateTextInput = {
   temperature?: number;
   metadata?: Record<string, string>;
   usageContext?: AIUsageContext;
+  signal?: AbortSignal;
 };
 
 export type GenerateTextResult = AIResponseMetadata & {
@@ -53,14 +54,20 @@ export type EmbedTextInput = {
   model?: string;
   metadata?: Record<string, string>;
   usageContext?: AIUsageContext;
+  signal?: AbortSignal;
 };
 
 export type EmbedTextResult = AIResponseMetadata & {
   embedding: number[];
 };
 
-export type AIProvider = {
+export type ChatProvider = {
   streamChat(input: StreamChatInput): AsyncIterable<AIStreamEvent>;
   generateText(input: GenerateTextInput): Promise<GenerateTextResult>;
+};
+
+export type EmbeddingProvider = {
   embedText(input: EmbedTextInput): Promise<EmbedTextResult>;
 };
+
+export type AIProvider = ChatProvider & EmbeddingProvider;

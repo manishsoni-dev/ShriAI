@@ -66,3 +66,12 @@ jobs:
 
       - name: DB Readiness Check
         run: npm run db:ready
+
+      - name: Validate Scriptures
+        run: npm run scripture:validate
+
+      - name: Evaluate Retrievals
+        run: npm run scripture:eval
+
+      - name: Release Readiness Check
+        run: npm run release:check

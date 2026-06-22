@@ -3,23 +3,36 @@ import { z } from "zod";
 
 export const env = createEnv({
   server: {
-    AI_CHAT_MODEL: z.string().min(1).default("gpt-5-mini"),
-    AI_EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
-    AI_EMBEDDING_MODEL: z.string().min(1).default("text-embedding-3-small"),
-    AI_TEXT_MODEL: z.string().min(1).default("gpt-5-mini"),
+    OLLAMA_BASE_URL: loopbackUrl().default("http://127.0.0.1:11434"),
+    SHRI_AI_CHAT_MODEL: z.string().min(1).default("qwen3:8b"),
+    SHRI_AI_EMBEDDING_MODEL: z.string().min(1).default("qwen3-embedding:0.6b"),
+    SHRI_AI_EMBEDDING_DIMENSIONS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(1024),
+    SHRI_AI_CHAT_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(120_000),
+    SHRI_AI_EMBEDDING_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30_000),
+    STT_BASE_URL: loopbackUrl().default("http://127.0.0.1:8001"),
+    STT_MODEL: z.string().min(1).default("small"),
+    STT_TIMEOUT_MS: z.coerce.number().int().positive().default(100_000),
+    STT_SERVICE_TOKEN: z.string().min(32).optional(),
     AUTH_SECRET: z.string().min(32),
     DATABASE_URL: z.string().url(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
-    OPENAI_API_KEY: z.string().min(1).optional(),
-    // Voice API keys are optional. Text fallback should still render without them.
-    ELEVENLABS_API_KEY: z.string().min(1).optional(),
-    DEEPGRAM_API_KEY: z.string().min(1).optional(),
-    GOOGLE_API_KEY: z.string().min(1).optional(),
-    STT_PROVIDER: z.enum(["openai", "deepgram", "google"]).default("openai"),
     REVIEWER_EMAILS: z.string().optional(),
     ADMIN_EMAILS: z.string().optional(),
+    STAGING_ALLOWLIST: z.string().optional(),
     RELEASE_ENVIRONMENT: z.string().min(1).default("staging"),
     RELEASE_MIN_VOICE_APPROVED_CHUNKS: z.coerce
       .number()
@@ -37,20 +50,22 @@ export const env = createEnv({
   },
   client: {},
   runtimeEnv: {
-    AI_CHAT_MODEL: process.env.AI_CHAT_MODEL,
-    AI_EMBEDDING_DIMENSIONS: process.env.AI_EMBEDDING_DIMENSIONS,
-    AI_EMBEDDING_MODEL: process.env.AI_EMBEDDING_MODEL,
-    AI_TEXT_MODEL: process.env.AI_TEXT_MODEL,
+    OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL,
+    SHRI_AI_CHAT_MODEL: process.env.SHRI_AI_CHAT_MODEL,
+    SHRI_AI_EMBEDDING_MODEL: process.env.SHRI_AI_EMBEDDING_MODEL,
+    SHRI_AI_EMBEDDING_DIMENSIONS: process.env.SHRI_AI_EMBEDDING_DIMENSIONS,
+    SHRI_AI_CHAT_TIMEOUT_MS: process.env.SHRI_AI_CHAT_TIMEOUT_MS,
+    SHRI_AI_EMBEDDING_TIMEOUT_MS: process.env.SHRI_AI_EMBEDDING_TIMEOUT_MS,
+    STT_BASE_URL: process.env.STT_BASE_URL,
+    STT_MODEL: process.env.STT_MODEL,
+    STT_TIMEOUT_MS: process.env.STT_TIMEOUT_MS,
+    STT_SERVICE_TOKEN: process.env.STT_SERVICE_TOKEN,
     AUTH_SECRET: process.env.AUTH_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    ELEVENLABS_API_KEY: process.env.ELEVENLABS_API_KEY,
-    DEEPGRAM_API_KEY: process.env.DEEPGRAM_API_KEY,
-    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
-    STT_PROVIDER: process.env.STT_PROVIDER,
     REVIEWER_EMAILS: process.env.REVIEWER_EMAILS,
     ADMIN_EMAILS: process.env.ADMIN_EMAILS,
+    STAGING_ALLOWLIST: process.env.STAGING_ALLOWLIST,
     RELEASE_ENVIRONMENT: process.env.RELEASE_ENVIRONMENT,
     RELEASE_MIN_VOICE_APPROVED_CHUNKS:
       process.env.RELEASE_MIN_VOICE_APPROVED_CHUNKS,
@@ -61,3 +76,21 @@ export const env = createEnv({
   },
   emptyStringAsUndefined: true,
 });
+
+function loopbackUrl() {
+  return z
+    .string()
+    .url()
+    .refine(
+      (value) => {
+        const hostname = new URL(value).hostname;
+        return (
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname === "::1" ||
+          hostname === "[::1]"
+        );
+      },
+      { message: "Local AI services must use a loopback URL." },
+    );
+}
