@@ -33,7 +33,7 @@ export const env = createEnv({
     REVIEWER_EMAILS: z.string().optional(),
     ADMIN_EMAILS: z.string().optional(),
     STAGING_ALLOWLIST: z.string().optional(),
-    RELEASE_ENVIRONMENT: z.string().min(1).default("staging"),
+    RELEASE_ENVIRONMENT: z.string().min(1).default("development"),
     RELEASE_MIN_VOICE_APPROVED_CHUNKS: z.coerce
       .number()
       .int()
