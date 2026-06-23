@@ -10,335 +10,167 @@
       "id": "gita-eval-031",
       "question": "How can I restrain restless senses?",
       "personaId": "krishna",
-      "themes": [
-        "self-mastery"
-      ],
-      "expectedRefs": [
-        "2.58",
-        "2.60",
-        "2.61"
-      ],
-      "acceptableChapters": [
-        2
-      ]
+      "themes": ["self-mastery"],
+      "expectedRefs": ["2.58", "2.60", "2.61"],
+      "acceptableChapters": [2]
     },
     {
       "id": "gita-eval-032",
       "question": "What if the mind is restless?",
       "personaId": "krishna",
-      "themes": [
-        "meditation"
-      ],
-      "expectedRefs": [
-        "6.34",
-        "6.35",
-        "6.26"
-      ],
-      "acceptableChapters": [
-        6
-      ]
+      "themes": ["meditation"],
+      "expectedRefs": ["6.34", "6.35", "6.26"],
+      "acceptableChapters": [6]
     },
     {
       "id": "gita-eval-033",
       "question": "Does effort on the path ever go to waste?",
       "personaId": "krishna",
-      "themes": [
-        "discipline"
-      ],
-      "expectedRefs": [
-        "2.40",
-        "6.40",
-        "6.41"
-      ],
-      "acceptableChapters": [
-        2,
-        6
-      ]
+      "themes": ["discipline"],
+      "expectedRefs": ["2.40", "6.40", "6.41"],
+      "acceptableChapters": [2, 6]
     },
     {
       "id": "gita-eval-034",
       "question": "Who is the highest yogi?",
       "personaId": "krishna",
-      "themes": [
-        "devotion",
-        "meditation"
-      ],
-      "expectedRefs": [
-        "6.46",
-        "6.47"
-      ],
-      "acceptableChapters": [
-        6
-      ]
+      "themes": ["devotion", "meditation"],
+      "expectedRefs": ["6.46", "6.47"],
+      "acceptableChapters": [6]
     },
     {
       "id": "gita-eval-035",
       "question": "How do I understand divine nature?",
       "personaId": "krishna",
-      "themes": [
-        "knowledge"
-      ],
-      "expectedRefs": [
-        "7.4",
-        "7.5",
-        "7.7"
-      ],
-      "acceptableChapters": [
-        7
-      ]
+      "themes": ["knowledge"],
+      "expectedRefs": ["7.4", "7.5", "7.7"],
+      "acceptableChapters": [7]
     },
     {
       "id": "gita-eval-036",
       "question": "How can I see Krishna in the world?",
       "personaId": "krishna",
-      "themes": [
-        "devotion"
-      ],
-      "expectedRefs": [
-        "7.8",
-        "7.9",
-        "7.10"
-      ],
-      "acceptableChapters": [
-        7
-      ]
+      "themes": ["devotion"],
+      "expectedRefs": ["7.8", "7.9", "7.10"],
+      "acceptableChapters": [7]
     },
     {
       "id": "gita-eval-037",
       "question": "What are the gunas?",
       "personaId": "krishna",
-      "themes": [
-        "knowledge"
-      ],
-      "expectedRefs": [
-        "7.12",
-        "7.13",
-        "3.27"
-      ],
-      "acceptableChapters": [
-        3,
-        7
-      ]
+      "themes": ["knowledge"],
+      "expectedRefs": ["7.12", "7.13", "3.27"],
+      "acceptableChapters": [3, 7]
     },
     {
       "id": "gita-eval-038",
       "question": "How do I move beyond delusion?",
       "personaId": "krishna",
-      "themes": [
-        "wisdom"
-      ],
-      "expectedRefs": [
-        "2.52",
-        "7.14",
-        "7.15"
-      ],
-      "acceptableChapters": [
-        2,
-        7
-      ]
+      "themes": ["wisdom"],
+      "expectedRefs": ["2.52", "7.14", "7.15"],
+      "acceptableChapters": [2, 7]
     },
     {
       "id": "gita-eval-039",
       "question": "Who turns toward Krishna?",
       "personaId": "krishna",
-      "themes": [
-        "bhakti"
-      ],
-      "expectedRefs": [
-        "7.16",
-        "7.17",
-        "7.18"
-      ],
-      "acceptableChapters": [
-        7
-      ]
+      "themes": ["bhakti"],
+      "expectedRefs": ["7.16", "7.17", "7.18"],
+      "acceptableChapters": [7]
     },
     {
       "id": "gita-eval-040",
       "question": "What is the problem with desire-led worship?",
       "personaId": "krishna",
-      "themes": [
-        "detachment"
-      ],
-      "expectedRefs": [
-        "7.20",
-        "2.62",
-        "3.39"
-      ],
-      "acceptableChapters": [
-        2,
-        3,
-        7
-      ]
+      "themes": ["detachment"],
+      "expectedRefs": ["7.20", "2.62", "3.39"],
+      "acceptableChapters": [2, 3, 7]
     },
     {
       "id": "gita-eval-041",
       "question": "Why should I not collapse into weakness?",
       "personaId": "krishna",
-      "themes": [
-        "courage"
-      ],
-      "expectedRefs": [
-        "2.2",
-        "2.3"
-      ],
-      "acceptableChapters": [
-        2
-      ]
+      "themes": ["courage"],
+      "expectedRefs": ["2.2", "2.3"],
+      "acceptableChapters": [2]
     },
     {
       "id": "gita-eval-042",
       "question": "How should I decide when family duty conflicts with moral duty?",
       "personaId": "krishna",
-      "themes": [
-        "moral-conflict"
-      ],
-      "expectedRefs": [
-        "1.28",
-        "2.7",
-        "2.31"
-      ],
-      "acceptableChapters": [
-        1,
-        2
-      ]
+      "themes": ["moral-conflict"],
+      "expectedRefs": ["1.28", "2.7", "2.31"],
+      "acceptableChapters": [1, 2]
     },
     {
       "id": "gita-eval-043",
       "question": "What does Krishna say about death and the soul?",
       "personaId": "krishna",
-      "themes": [
-        "wisdom"
-      ],
-      "expectedRefs": [
-        "2.20",
-        "2.22",
-        "2.23"
-      ],
-      "acceptableChapters": [
-        2
-      ]
+      "themes": ["wisdom"],
+      "expectedRefs": ["2.20", "2.22", "2.23"],
+      "acceptableChapters": [2]
     },
     {
       "id": "gita-eval-044",
       "question": "How do I stay balanced in success and failure?",
       "personaId": "krishna",
-      "themes": [
-        "steadiness"
-      ],
-      "expectedRefs": [
-        "2.38",
-        "2.48",
-        "6.7"
-      ],
-      "acceptableChapters": [
-        2,
-        6
-      ]
+      "themes": ["steadiness"],
+      "expectedRefs": ["2.38", "2.48", "6.7"],
+      "acceptableChapters": [2, 6]
     },
     {
       "id": "gita-eval-045",
       "question": "What does yoga mean in action?",
       "personaId": "krishna",
-      "themes": [
-        "karma"
-      ],
-      "expectedRefs": [
-        "2.48",
-        "2.50",
-        "3.7"
-      ],
-      "acceptableChapters": [
-        2,
-        3
-      ]
+      "themes": ["karma"],
+      "expectedRefs": ["2.48", "2.50", "3.7"],
+      "acceptableChapters": [2, 3]
     },
     {
       "id": "gita-eval-046",
       "question": "How can I avoid hypocrisy in spiritual practice?",
       "personaId": "krishna",
-      "themes": [
-        "discipline"
-      ],
-      "expectedRefs": [
-        "3.6",
-        "3.7"
-      ],
-      "acceptableChapters": [
-        3
-      ]
+      "themes": ["discipline"],
+      "expectedRefs": ["3.6", "3.7"],
+      "acceptableChapters": [3]
     },
     {
       "id": "gita-eval-047",
       "question": "Why should leaders act carefully?",
       "personaId": "krishna",
-      "themes": [
-        "action"
-      ],
-      "expectedRefs": [
-        "3.21",
-        "3.24",
-        "3.26"
-      ],
-      "acceptableChapters": [
-        3
-      ]
+      "themes": ["action"],
+      "expectedRefs": ["3.21", "3.24", "3.26"],
+      "acceptableChapters": [3]
     },
     {
       "id": "gita-eval-048",
       "question": "What should I do with attachment to my own role?",
       "personaId": "krishna",
-      "themes": [
-        "duty",
-        "detachment"
-      ],
-      "expectedRefs": [
-        "3.35",
-        "2.31"
-      ],
-      "acceptableChapters": [
-        2,
-        3
-      ]
+      "themes": ["duty", "detachment"],
+      "expectedRefs": ["3.35", "2.31"],
+      "acceptableChapters": [2, 3]
     },
     {
       "id": "gita-eval-049",
       "question": "How does sacrifice relate to daily life?",
       "personaId": "krishna",
-      "themes": [
-        "sacred-action"
-      ],
-      "expectedRefs": [
-        "3.9",
-        "3.10",
-        "3.13"
-      ],
-      "acceptableChapters": [
-        3
-      ]
+      "themes": ["sacred-action"],
+      "expectedRefs": ["3.9", "3.10", "3.13"],
+      "acceptableChapters": [3]
     },
     {
       "id": "gita-eval-050",
       "question": "How can I become a friend to myself?",
       "personaId": "krishna",
-      "themes": [
-        "self-mastery"
-      ],
-      "expectedRefs": [
-        "6.5",
-        "6.6"
-      ],
-      "acceptableChapters": [
-        6
-      ]
+      "themes": ["self-mastery"],
+      "expectedRefs": ["6.5", "6.6"],
+      "acceptableChapters": [6]
     },
     {
       "id": "isha-002",
       "question": "Is there delusion when seeing all beings in the Self?",
       "personaId": "krishna",
-      "expectedRefs": [
-        "7"
-      ]
+      "expectedRefs": ["7"]
     }
   ]
 }
