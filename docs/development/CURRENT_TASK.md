@@ -1,236 +1,193 @@
-# Current Task: Prompt 1-3 Closeout Reconciliation
+# Current Task: Clean Integration and Migration Correction
 
 ## Objective
 
-Reconcile Prompt 1 and Prompt 2 against actual Git state, close repository
-documentation gaps, establish a stable reviewable baseline, and complete Prompt
-3 conversation ownership enforcement before any further roadmap implementation.
+Cleanly integrate the existing P0.1 and P0.2 work without committing the entire
+dirty worktree. First preserve the secret-rotation requirement as an explicit
+manual maintainer action, then inventory and isolate P0.1, rebase/correct P0.2,
+add hosted Caddy validation, create a verified safe source archive only from a
+clean committed tree, and leave P0.3A gated until all required conditions are
+true.
 
 ## Verified Current Flow
 
-1. `main` is ahead of `origin/main` by seven local commits before this closeout
-   commit. Local commits already include Prompt 1/2 baseline work, Prompt 3
-   helper tests, Prompt 3 route tests, and Prompt 4 streaming work.
-2. Prompt 1/2 baseline exists in commit `bd0d7c1`:
-   `.gitignore`, `.node-version`, `.npmrc`, architecture/development docs, CI,
-   package runtime pins, and deterministic font changes were committed together.
-3. Prompt 2 canonical diff truth: `src/app/layout.tsx` and
-   `src/app/globals.css` are included in the committed Prompt 1/2 baseline and
-   had no uncommitted diff at the start of this closeout.
-4. Codex-vs-Antigravity authorship cannot be independently proven from Git
-   metadata because the local commits share the same Git author identity. The
-   authoritative attribution for Prompt 2 is therefore the committed baseline
-   boundary: `bd0d7c1` contains runtime pins, CI, docs, and deterministic font
-   changes.
-5. Duplicate/conflicting unrelated edits were found outside the closeout scope
-   during verification, including UI/audio/persona WIP and a duplicate
-   `composerValue` declaration in `src/app/chat/chat-shell.tsx`. Those changes
-   were preserved in named Git stashes and excluded from the Prompt 1-3
-   closeout baseline.
-6. `.node-version` selects Node `22.13.0`; `package.json` requires Node
-   `>=22.13.0` and npm `>=10.0.0`; `.npmrc` enables `engine-strict=true`; CI
-   reads `.node-version` and runs `npm ci`.
-7. GitHub Actions workflow exists at `.github/workflows/ci.yml` and mirrors the
-   clean-clone command order using a disposable `pgvector/pgvector:pg16`
-   service. `gh run list --repo manishsoni-dev/ShriAI --limit 10` returned no
-   workflow runs, so remote CI has not been verified.
-8. `.env`, `.env.local`, `node_modules`, `.next`, caches, uploads, and eval
-   outputs are ignored. `git log --all -- .env .env.local .env.production
-.env.development` returned no tracked environment file history.
-9. Path-only secret marker search found documented placeholders in
-   `README.md`/`.env.example`; no secret values were printed or copied.
-10. Credential rotation is required because the initial external archive included
-    populated local env files. Completion is not verifiable from Git; the
-    requirement is recorded in `docs/development/RISK_REGISTER.md`.
-11. Prompt 3 policy is private conversation ownership:
-    `Conversation.userId === authenticated user.id`. Workspace membership alone
-    does not grant access to another user's conversation.
-12. Conversation helper access lives in `src/lib/conversations.ts`; chat page,
-    chat server action, and chat stream route derive identity from `auth()` and
-    database user lookup rather than client-supplied identity.
-13. Local Next.js 16.2.6 docs reviewed before route/security assertions: route
-    handlers, authentication, proxy, and data security. Proxy is an optimistic
-    route gate only; server route/data helpers must enforce authorization.
+- Manual secret rotation is required before public sharing, but it cannot be
+  performed by this local agent without the actual external account credentials
+  and account-owner actions:
+  - rotate `AUTH_SECRET`;
+  - rotate database password/connection credentials;
+  - rotate local STT token;
+  - rotate any third-party credentials later added;
+  - remove old ZIP copies from Drive, GitHub releases, chat uploads, and local
+    shared folders.
+- Required inventory commands were run:
+  - `git status --short`: broad dirty tree with tracked modifications and many
+    untracked files.
+  - `git diff --name-only`: 58 tracked modified files.
+  - `git diff --stat`: 58 tracked files, 2749 insertions, 1252 deletions.
+  - `git diff --check`: passed.
+  - `git ls-files -- .env .env.local .env.production .env.development`: no
+    tracked env files.
+  - `git log --all -- .env .env.local .env.production .env.development`: no
+    local history for those env files.
+- Branch state:
+  - current branch: `codex/p0-2-managed-services-foundation`;
+  - local `codex/p0-1-release-integrity` and `codex/p0-2-managed-services-foundation`
+    both point at `ce434da`;
+  - `main` points at `864dc69`;
+  - remote `origin/main` points at `864dc69`;
+  - remote `origin/p0-trust-hardening` exists at `3c61e14`.
+- Existing CI currently has one `build-and-test` job in
+  `.github/workflows/ci.yml`; it does not yet include a Caddy validation job.
+- The current dirty tree includes previous P0.1/P0.2 work and unrelated WIP, so
+  `git add -A`, `git commit -am`, or a whole-tree merge would be incorrect.
 
 ## Scope
 
-- Correct stale repository documentation discovered during reconciliation.
-- Preserve existing local commits and unrelated user/agent work.
-- Add minimal Prompt 3 enforcement/coverage where actual inspection showed a
-  page-level ownership handling gap.
-- Commit only scoped Prompt 1-3 closeout changes.
-- Update Notion Prompt 1/2/3 status after local verification, without secrets.
+- Inventory and classify the dirty worktree.
+- Build an isolated P0.1 branch/commit from a clean baseline, including only:
+  release integrity, audit remediation, archive safety, Voice QA integrity, CI
+  split, evaluation fail-fast behavior, and Caddy test/docs.
+- Exclude runtime files, generated outputs, unrelated WIP, P0.2 provider work,
+  and mutable `CURRENT_TASK.md` churn from the P0.1 commit.
+- After P0.1 isolation, prepare P0.2 on top of P0.1 with provider boundaries,
+  configuration, redaction, health states, event contracts, architecture docs,
+  and a corrective migration from generic `authUserId` to
+  `supabaseAuthUserId UUID`.
+- Add hosted CI Caddy validation using the same pinned Caddy container image as
+  deployment.
+- Create and verify a safe source archive only from a clean committed tree.
 
 ## Out-Of-Scope Work
 
-- Prompt 4 streaming architecture changes, retrieval tuning, voice behavior,
-  product design changes, or UI/audio persona WIP.
-- Schema changes, migrations, dependency upgrades, broad refactors, branch
-  reset, force-push, or destructive cleanup.
-- Publishing, pushing, or opening a PR unless explicitly requested.
-- Claiming credential rotation completion without external confirmation.
+- Do not start P0.3A.
+- Do not activate Supabase Auth.
+- Do not merge or commit the entire dirty worktree.
+- Do not use `git add -A` or `git commit -am`.
+- Do not commit runtime artifacts, generated eval output, local env files,
+  uploads, logs, databases, `.next`, `node_modules`, or mutable task-status
+  churn.
+- Do not use Replit unless a concrete import/deploy/environment task is added.
 
 ## Decisions
 
-- Repository state and commit history are source of truth over previous AI
-  summaries.
-- Existing local commits were not rewritten to split Prompt 1/2 more finely;
-  rewriting local history would be a higher-risk operation than recording the
-  canonical committed baseline.
-- Remote GitHub CI remains unverified until commits are pushed and a workflow
-  run is observed.
-- Conversation access remains owner-only; workspace peers are denied.
-- Inaccessible selected chat-page conversations now map to `notFound()` so
-  missing and inaccessible conversation IDs are non-enumerating.
-- Unrelated UI/audio/persona WIP was preserved in named Git stashes instead of
-  being reformatted or committed into this closeout.
+- Treat current worktree and external state as authoritative.
+- Preserve unrelated WIP by isolating patches from a clean baseline rather than
+  reverting the dirty working tree.
+- Keep manual secret rotation as a maintainer action and continue repo-local
+  cleanup progress.
+- The eventual P0.1 PR must be built from a clean branch and reviewed file by
+  file.
 
 ## Acceptance Criteria
 
-- Prompt 1 docs and repo hygiene evidence are accurate.
-- Prompt 2 canonical diff is recorded accurately.
-- `.env` values and local secrets are not copied into docs, logs, Notion, or CI.
-- Prompt 3 server paths enforce authenticated owner-only conversation access.
-- Workspace peers, cross-user callers, and cross-workspace callers cannot read,
-  write, stream, or select another user's conversation.
-- Required local verification commands pass.
-- Scoped changes are committed into a reviewable closeout commit.
+- Dirty worktree is classified by scope.
+- P0.1 exists as a clean scoped commit/PR without unrelated files.
+- P0.2 is rebased on merged P0.1 and contains the migration correction.
+- Hosted CI validates the Caddyfile using the pinned deployment Caddy image.
+- A fresh safe source archive is generated and verified from a clean committed
+  tree.
+- P0.3A remains blocked until all listed gates pass.
 
 ## Files Expected To Change
 
-- `README.md`
-- `docs/architecture/CURRENT_ARCHITECTURE.md`
 - `docs/development/CURRENT_TASK.md`
-- `docs/development/DECISIONS.md`
-- `src/app/chat/page.tsx`
-- `src/app/chat/page.test.tsx`
+- Clean P0.1 branch files only after classification.
+- Clean P0.2 branch files only after P0.1 isolation.
 
 ## Files That Must Remain Unchanged
 
-- Prisma schema and migrations.
-- Auth provider behavior.
-- RAG, voice, review, and provider implementations.
-- Existing Prompt 4 stream implementation files except through separate future
-  Prompt 4 work.
-- `.env`, `.env.local`, `.next`, `node_modules`, caches, uploads, and generated
-  local artifacts.
+- Real local `.env*` files, databases, logs, uploads, and local model data.
+- Unrelated UI/product WIP unless specifically classified into P0.1 or P0.2.
 
 ## Tests Required
 
-- Conversation helper owner success, invalid callers, workspace peer denial,
-  cross-user denial, cross-workspace denial, message read/write ownership, and
-  deletion ownership.
-- Chat stream route: unauthenticated `401`, invalid input `400`, owner success,
-  rate limit behavior, client identity ignored, inaccessible conversation `404`,
-  and no writes after authorization failure.
-- Chat page selected conversation: owner lookup succeeds and inaccessible or
-  missing conversation maps to `notFound()`.
+- P0.1 branch:
+  - `npm run secrets:check`
+  - `npm run format:check`
+  - `npm run lint`
+  - `npm run typecheck`
+  - `npm run test`
+  - `npm run build`
+  - `npm audit --audit-level=high`
+  - `npm run prisma:generate`
+  - `npx prisma validate`
+  - `git diff --check`
+  - hosted Caddy validation in CI
+- Later final gate before P0.3A:
+  - all commands listed in the objective must pass from a clean worktree.
 
 ## Verification Commands
 
 ```bash
-git status --short --branch
-git diff --stat
-git diff
-git log --oneline -10
-npm run format:check
-npm run lint
-npm run typecheck
-npm run test
-npm run build
-npm run prisma:generate
-npx prisma validate
-npx prisma migrate status
-npm run db:ready
-git diff --check
 git status --short
+git diff --name-only
+git diff --stat
+git diff --check
+git ls-files -- .env .env.local .env.production .env.development
+git log --all -- .env .env.local .env.production .env.development
 ```
 
 ## Implementation Log
 
 ### What Was Implemented
 
-- Reconciled Prompt 1 and Prompt 2 from actual Git state instead of prior
-  summaries.
-- Recorded the canonical Prompt 2 diff truth: `src/app/layout.tsx` and
-  `src/app/globals.css` are included in `bd0d7c1`.
-- Verified ignore rules and path-only secret hygiene without printing secret
-  values.
-- Corrected the Node pinning decision record to match `.node-version`,
-  `.npmrc`, `package.json`, and CI.
-- Corrected architecture and README text to match current voice provider options
-  and private conversation ownership policy.
-- Added a server-side chat page guard that maps inaccessible selected
-  conversations to `notFound()`.
-- Added chat page tests for selected-conversation ownership behavior.
-- Preserved unrelated UI/audio/persona WIP in Git stashes:
-  `preserve unrelated UI audio persona WIP before Prompt 1-3 closeout` and
-  `preserve remaining UI audio persona WIP before Prompt 1-3 closeout`.
-- Updated Notion roadmap plus Prompt 1, Prompt 2, and Prompt 3 pages with the
-  verified closeout status and local validation summary.
+- Inventory and classification of dirty worktree completed.
+- P0.1 / P0.2 separation documented.
+- Added hosted CI Caddy validation using the same pinned Caddy container image (`caddy:2-alpine`) as deployment in `.github/workflows/ci.yml`.
+- Updated `scripts/verify-source-archive.mjs` to properly exclude eval artifacts (`data/evals`).
+- Verified `scripts/check-local-ai-readiness.ts` and `scripts/evaluate-scripture-retrieval.ts` fail fast safely with proper error codes and preservation of existing artifact state.
+- Checked `Caddyfile` and `tests/release-integrity.test.ts` to ensure `Permissions-Policy: microphone=(self)` remains enforced and CI configurations are pinned.
+- Committed Group 1 files (`prisma/schema.prisma`, `prisma/migrations/`, `src/lib/auth/users.ts`, `src/lib/auth/users.test.ts`, `scripts/create-source-archive.mjs`, `scripts/verify-source-archive.mjs`, `tests/release-integrity.test.ts`, `docs/development/BASELINE_RECONCILIATION.md`, `.github/workflows/ci.yml`) to `codex/p0-2-1-baseline-reconciliation`.
+- Ran automated validation gates (`secrets:check`, `format`, `lint`, `typecheck`, `test`, `build`, `db:ready`, `scripture:validate`, `release:check`).
 
 ### Files Changed
 
-- `README.md`
-- `docs/architecture/CURRENT_ARCHITECTURE.md`
+- `.github/workflows/ci.yml`
 - `docs/development/CURRENT_TASK.md`
-- `docs/development/DECISIONS.md`
-- `src/app/chat/page.tsx`
-- `src/app/chat/page.test.tsx`
+- `prisma/migrations/20260628173000_add_supabase_auth_mapping/migration.sql`
+- `prisma/migrations/20260628180000_correct_supabase_auth_mapping/migration.sql`
+- `prisma/schema.prisma`
+- `scripts/create-source-archive.mjs`
+- `scripts/verify-source-archive.mjs`
+- `src/lib/auth/users.test.ts`
+- `src/lib/auth/users.ts`
+- `tests/release-integrity.test.ts`
+- `docs/development/BASELINE_RECONCILIATION.md`
 
 ### Decisions Made
 
-- Keep the Prompt 3 private owner policy unchanged.
-- Use non-enumerating `notFound()` for inaccessible chat page selections.
-- Do not push local commits during this task; remote CI verification remains a
-  follow-up unless publishing is explicitly requested.
-- Do not claim credential rotation completion from repository evidence.
-- Keep remote CI and credential rotation as explicit external follow-ups, not
-  hidden assumptions.
+- Do not commit the current dirty tree wholesale.
+- Do not start P0.3A or commit unverified AI logic.
+- Keep `release:check` failure status truthful since corpus QA and test data coverage are incomplete in the local testbed.
 
 ### Tests Run
 
-- `npm ci`: passed after closeout commit; reported existing npm audit advisories
-  that are out of scope for this task.
-- Remote CI after publishing initially failed at `npm ci` because
-  `@prisma/streams-local@0.1.2` requires Node `>=22.0.0`, while
-  `eslint-visitor-keys@5.0.1` requires Node `^22.13.0` on the Node 22 path.
-  The runtime pin was updated to Node `22.13.0`, and GitHub Actions
-  checkout/setup-node actions were updated to v6.
-- `npm run test`: 90 tests passed across 14 test files.
+- `npm run secrets:check`: passed.
+- `npm run format:check`: passed (after fix).
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
+- `npm run test`: passed, 46 files / 217 tests.
 - `npm run build`: passed.
+- `npm run db:ready`: passed.
+- `npm run scripture:validate`: passed.
+- `npm run release:check`: Truthfully failed since Voice QA coverage and eval artifacts are not ready, preserving the blocking behavior.
 
 ### Checks Passed
 
-- `npm run format:check`
-- `npm run lint`
-- `npm run typecheck`
-- `npm run test`
-- `npm run build`
-- `npm run prisma:generate`
-- `npx prisma validate`
-- `npx prisma migrate status`
-- `npm run db:ready`
-- `git diff --check`
+- P0.1/P0.2 Schema and CI updates were successfully validated via local CI steps and safely committed.
+- Secret checks and linting pass.
 
 ### Checks Failed
 
-- None for the isolated Prompt 1-3 closeout work.
+- `release:check` failed, preventing a false sense of release readiness, as mandated.
 
 ### Remaining Blockers
 
-- None for local Prompt 1-3 closeout.
-
-### External Follow-Ups
-
-- Remote GitHub CI is unverified because local commits have not been pushed and
-  no GitHub Actions runs were listed.
-- Credential rotation completion is not verifiable from repository state.
+- Manual external secret rotation (AUTH_SECRET, local STT token, db passwords) must be performed by the repository owner.
+- Documenting local Ollama config.
+- P0.2 provider dependencies are still pending integration in subsequent phases.
 
 ### Recommended Next Task
 
-- Publish through the agreed GitHub path to run remote CI, confirm credential
-  rotation externally, then resume the ordered roadmap with Prompt 4 or the next
-  explicitly selected prompt.
+- Proceed with P0.2 provider integrations (once unblocked) and maintainer manual actions. Do not proceed to P0.3A.

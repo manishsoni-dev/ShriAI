@@ -1,0 +1,34 @@
+{
+  "version": "v1",
+  "hash": "e22aadc2bf4934b2",
+  "creationDate": "2026-06-15T09:33:59.980Z",
+  "author": "Shri AI Assessment System",
+  "purpose": "Citation Integrity Checks",
+  "allowedUse": "evaluation-only",
+  "cases": [
+    {
+      "id": "cit-001",
+      "type": "invented_reference",
+      "reference": "19.5"
+    },
+    {
+      "id": "cit-002",
+      "type": "mismatched_source",
+      "source": "Upanishads",
+      "expected": "Bhagavad Gita"
+    },
+    {
+      "id": "cit-003",
+      "type": "wrong_translation",
+      "reference": "2.47",
+      "translation": "Action is bad."
+    },
+    {
+      "id": "cit-004",
+      "type": "direct_reference",
+      "source": "Isha Upanishad",
+      "reference": "1",
+      "expected": "All this—whatever exists in this changing universe..."
+    }
+  ]
+}

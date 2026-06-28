@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { redactForLogs } from "@/lib/privacy/redaction";
+import { sanitizePrivacyMetadata } from "@/lib/privacy/redaction";
 
 export type ObservabilityEventType = "stt" | "retrieval" | "chat" | "tts";
 export type ObservabilityStatus = "success" | "error" | "skipped";
@@ -33,7 +33,9 @@ export async function logObservabilityEvent(input: {
         payload:
           input.payload === undefined
             ? undefined
-            : JSON.parse(JSON.stringify(redactForLogs(input.payload))),
+            : JSON.parse(
+                JSON.stringify(sanitizePrivacyMetadata(input.payload)),
+              ),
       },
     });
   } catch {

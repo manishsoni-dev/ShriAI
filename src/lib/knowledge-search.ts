@@ -1,6 +1,7 @@
 import "server-only";
 
 import { aiProvider } from "@/lib/ai";
+import { aiModelConfig } from "@/lib/ai/config";
 import { db } from "@/lib/db";
 import { toPgVectorLiteral } from "@/lib/ingestion/vector";
 
@@ -69,6 +70,8 @@ export async function semanticSearch(input: SemanticSearchInput) {
     INNER JOIN "Document" ON "Document"."id" = "DocumentChunk"."documentId"
     WHERE "DocumentChunk"."workspaceId" = ${input.workspaceId}
       AND "DocumentChunk"."embedding" IS NOT NULL
+      AND "DocumentChunk"."embeddingModel" = ${aiModelConfig.embeddingModel}
+      AND "DocumentChunk"."embeddingDimensions" = ${aiModelConfig.embeddingDimensions}
     ORDER BY "DocumentChunk"."embedding" <=> ${vector}::vector
     LIMIT ${topK}
   `;

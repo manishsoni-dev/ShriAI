@@ -8,13 +8,19 @@ import { type AIMessage } from "@/lib/ai/types";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { AIError } from "@/lib/ai";
+import { AIError, getAIUserFacingMessage } from "@/lib/ai";
 import {
   ConversationAccessError,
   createMessage,
   getConversation,
   listMessages,
 } from "@/lib/conversations";
+import {
+  createTurnId,
+  normalizeInteractionMode,
+  type ConversationPhase,
+  type TerminalStatus,
+} from "@/lib/conversation-state";
 import { db } from "@/lib/db";
 import { semanticSearch } from "@/lib/knowledge-search";
 import { logObservabilityEvent } from "@/lib/observability";
@@ -23,7 +29,13 @@ import {
   getPersonaFromMetadata,
   isPersonaId,
 } from "@/lib/personas";
-import { checkRateLimit, rateLimitResponseHeaders } from "@/lib/rate-limit";
+import {
+  checkConcurrency,
+  checkRateLimit,
+  rateLimitResponseHeaders,
+  releaseConcurrency,
+} from "@/lib/rate-limit";
+import { env } from "@/env";
 import {
   formatScriptureContextForPrompt,
   retrieveScriptureContext,
@@ -33,9 +45,12 @@ import { crisisSupportMessage, detectCrisisIntent } from "@/lib/safety/crisis";
 
 type StreamRequest = {
   conversationId?: string;
+  interactionMode?: string;
   message?: string;
   personaId?: string;
+  source?: "text" | "voice";
   traceId?: string;
+  turnId?: string;
 };
 
 function streamEvent(event: unknown) {
@@ -56,6 +71,79 @@ function serializeMessage(message: {
   };
 }
 
+function phaseEvent(input: {
+  phase: ConversationPhase;
+  traceId: string;
+  turnId: string;
+}) {
+  return {
+    type: "phase",
+    phase: input.phase,
+    traceId: input.traceId,
+    turnId: input.turnId,
+  };
+}
+
+function doneEvent(input: {
+  status: TerminalStatus;
+  traceId: string;
+  turnId: string;
+}) {
+  return {
+    type: "done",
+    status: input.status,
+    traceId: input.traceId,
+    turnId: input.turnId,
+  };
+}
+
+function localAIErrorCode(error: unknown) {
+  if (!(error instanceof AIError)) return "LOCAL_AI_UNAVAILABLE";
+  if (error.code === "AI_BAD_REQUEST") return "LOCAL_MODEL_MISSING";
+  if (error.code === "AI_TIMEOUT" || error.code === "AI_UNAVAILABLE") {
+    return "LOCAL_AI_UNAVAILABLE";
+  }
+  return "LOCAL_AI_UNAVAILABLE";
+}
+
+const HISTORY_MAX_MESSAGES = 12;
+const HISTORY_MAX_CHARS = 8000;
+
+function buildBoundedHistory(
+  messages: Array<{
+    content: string;
+    role: "user" | "assistant" | "system" | "tool";
+  }>,
+): AIMessage[] {
+  const history: AIMessage[] = [];
+  let totalChars = 0;
+
+  for (const message of messages.toReversed()) {
+    if (message.role !== "user" && message.role !== "assistant") {
+      continue;
+    }
+
+    const content = message.content.trim();
+    if (!content) continue;
+
+    const nextTotal = totalChars + content.length;
+    if (
+      history.length >= HISTORY_MAX_MESSAGES ||
+      nextTotal > HISTORY_MAX_CHARS
+    ) {
+      break;
+    }
+
+    history.unshift({
+      role: message.role,
+      content,
+    });
+    totalChars = nextTotal;
+  }
+
+  return history;
+}
+
 // ── Scripture retrieval (primary RAG source) ──────────────────────────────────
 
 async function getScriptureRAGContext(input: {
@@ -65,6 +153,7 @@ async function getScriptureRAGContext(input: {
   traceId: string;
   userId: string;
   conversationId: string;
+  source: "text" | "voice";
 }): Promise<ScriptureRetrievalResult | null> {
   if (!isPersonaId(input.personaId)) return null;
 
@@ -72,7 +161,7 @@ async function getScriptureRAGContext(input: {
     return await retrieveScriptureContext({
       query: input.query,
       personaId: input.personaId,
-      mode: "voice",
+      mode: input.source,
       limit: 6,
       debugMode: input.isDevMode,
       threshold: 0,
@@ -203,15 +292,38 @@ export async function POST(request: Request) {
     );
   }
 
+  let concurrencyReleased = false;
+  const release = () => {
+    if (!concurrencyReleased) {
+      releaseConcurrency("ollama_chat");
+      concurrencyReleased = true;
+    }
+  };
+
   const body = (await request.json().catch(() => null)) as StreamRequest | null;
   const conversationId = body?.conversationId;
   const content = body?.message?.trim();
   const requestedPersonaId = body?.personaId;
   const traceId = body?.traceId ?? crypto.randomUUID();
+  const turnId =
+    typeof body?.turnId === "string" && body.turnId.trim()
+      ? body.turnId.trim()
+      : createTurnId();
+  const interactionMode = normalizeInteractionMode({
+    interactionMode: body?.interactionMode,
+    legacySource: body?.source,
+  });
 
   if (!conversationId || !content) {
     return NextResponse.json(
       { error: "conversationId and message are required." },
+      { status: 400 },
+    );
+  }
+
+  if (!interactionMode) {
+    return NextResponse.json(
+      { error: "interactionMode must be text or voice." },
       { status: 400 },
     );
   }
@@ -229,6 +341,7 @@ export async function POST(request: Request) {
       conversationId: conversation.id,
       limit: 20,
     });
+    const history = buildBoundedHistory(previousMessages);
 
     // Duplicate send prevention
     if (previousMessages.length > 0) {
@@ -281,6 +394,7 @@ export async function POST(request: Request) {
 
     if (detectCrisisIntent(content)) {
       const answer = crisisSupportMessage();
+      const voiceEligible = interactionMode === "voice";
       const assistantMessage = await createMessage({
         userId: user.id,
         conversationId: conversation.id,
@@ -290,8 +404,12 @@ export async function POST(request: Request) {
           provider: "safety",
           model: "crisis-routing",
           grounding: "crisis-support",
+          interactionMode,
+          personaId: persona.id,
           spokenAnswer: answer,
           traceId,
+          turnId,
+          voiceEligible,
         },
       });
 
@@ -306,8 +424,11 @@ export async function POST(request: Request) {
         model: "crisis-routing",
         latencyMs: Date.now() - startedAt,
         payload: {
-          userQuery: content,
+          contentLength: content.length,
+          interactionMode,
           safetyRoute: "crisis",
+          status: "completed",
+          turnId,
         },
       });
 
@@ -316,9 +437,16 @@ export async function POST(request: Request) {
         start(controller) {
           controller.enqueue(
             encoder.encode(
+              streamEvent(phaseEvent({ phase: "streaming", traceId, turnId })),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
               streamEvent({
                 type: "user-message",
                 message: serializeMessage(userMessage),
+                traceId,
+                turnId,
               }),
             ),
           );
@@ -327,6 +455,8 @@ export async function POST(request: Request) {
               streamEvent({
                 type: "assistant-delta",
                 text: answer,
+                traceId,
+                turnId,
               }),
             ),
           );
@@ -336,21 +466,60 @@ export async function POST(request: Request) {
                 type: "assistant-message",
                 message: serializeMessage(assistantMessage),
                 spokenAnswer: answer,
+                voiceEligible,
                 citations: [],
                 traceId,
+                turnId,
               }),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(doneEvent({ status: "completed", traceId, turnId })),
             ),
           );
           controller.close();
         },
       });
 
-      return new Response(stream, {
+      const wrappedStream = new ReadableStream({
+        async start(controller) {
+          const reader = stream.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+            controller.close();
+          } catch (e) {
+            controller.error(e);
+          } finally {
+            release();
+          }
+        },
+        cancel() {
+          release();
+        },
+      });
+
+      return new Response(wrappedStream, {
         headers: {
           "Cache-Control": "no-cache, no-transform",
           "Content-Type": "application/x-ndjson; charset=utf-8",
         },
       });
+    }
+
+    if (!checkConcurrency("ollama_chat", env.OLLAMA_MAX_CONCURRENCY)) {
+      return NextResponse.json(
+        {
+          code: "LOCAL_AI_UNAVAILABLE",
+          error:
+            "Local AI is currently at maximum capacity. Please try again in a few moments.",
+        },
+        { status: 503, headers: { "Retry-After": "5" } },
+      );
     }
 
     // ── Parallel: scripture RAG + workspace document search ─────────────────
@@ -362,6 +531,7 @@ export async function POST(request: Request) {
         traceId,
         userId: user.id,
         conversationId: conversation.id,
+        source: interactionMode,
       }),
       getWorkspaceDocumentContext({
         userId: user.id,
@@ -384,11 +554,23 @@ export async function POST(request: Request) {
             streamEvent({
               type: "user-message",
               message: serializeMessage(userMessage),
+              traceId,
+              turnId,
             }),
+          ),
+        );
+        controller.enqueue(
+          encoder.encode(
+            streamEvent(phaseEvent({ phase: "retrieving", traceId, turnId })),
           ),
         );
 
         try {
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(phaseEvent({ phase: "thinking", traceId, turnId })),
+            ),
+          );
           const streamGen = streamGroundedAnswer({
             query: content,
             persona,
@@ -397,13 +579,18 @@ export async function POST(request: Request) {
             insufficientContext: ragResult?.insufficientContext ?? false,
             insufficientApprovedContext:
               ragResult?.insufficientApprovedContext ?? false,
-            history: previousMessages.map((msg) => ({
-              role: msg.role as AIMessage["role"],
-              content: msg.content,
-            })),
+            evidence: ragResult?.evidence,
+            retrievedChunks: ragResult?.chunks ?? [],
+            history,
+            usageContext: {
+              userId: user.id,
+              workspaceId: conversation.workspaceId,
+              conversationId: conversation.id,
+            },
             signal: abortSignal,
           });
 
+          let firstTokenLatencyMs: number | null = null;
           let finalAnswer: GroundedAnswer | null = null;
 
           for await (const event of streamGen) {
@@ -412,11 +599,24 @@ export async function POST(request: Request) {
             }
 
             if (event.type === "delta") {
+              if (firstTokenLatencyMs === null) {
+                firstTokenLatencyMs = Date.now() - startedAt;
+                controller.enqueue(
+                  encoder.encode(
+                    streamEvent(
+                      phaseEvent({ phase: "streaming", traceId, turnId }),
+                    ),
+                  ),
+                );
+              }
+
               controller.enqueue(
                 encoder.encode(
                   streamEvent({
                     type: "assistant-delta",
                     text: event.text,
+                    traceId,
+                    turnId,
                   }),
                 ),
               );
@@ -426,6 +626,13 @@ export async function POST(request: Request) {
           }
 
           if (abortSignal.aborted) {
+            controller.enqueue(
+              encoder.encode(
+                streamEvent(
+                  doneEvent({ status: "cancelled", traceId, turnId }),
+                ),
+              ),
+            );
             controller.close();
             return;
           }
@@ -442,17 +649,34 @@ export async function POST(request: Request) {
             throw new Error("Generated answer contained invalid citations.");
           }
 
+          const voiceEligible =
+            interactionMode === "voice" &&
+            finalAnswer.grounding.usedRag &&
+            finalAnswer.citations.length > 0;
           const assistantMessage = await createMessage({
             userId: user.id,
             conversationId: conversation.id,
             role: "assistant",
             content: finalAnswer.displayAnswer,
             metadata: {
-              provider: "ai-gateway",
-              model: "gpt-4o-mini", // Passed dynamically if available, otherwise default
+              provider: finalAnswer.metadata?.provider ?? "ai-gateway",
+              model: finalAnswer.metadata?.model ?? "configured-chat-model",
               grounding: finalAnswer.grounding,
+              answer: finalAnswer.answer,
+              citations: finalAnswer.citations,
+              confidence: finalAnswer.confidence,
+              abstained: finalAnswer.abstained,
+              safetyNote: finalAnswer.safetyNote,
+              uncertainty: finalAnswer.uncertainty,
+              evidence: ragResult?.evidence,
+              interactionMode,
+              personaId: persona.id,
+              retrievalMode: ragResult?.mode ?? interactionMode,
               spokenAnswer: finalAnswer.spokenAnswer,
+              status: "completed",
               traceId,
+              turnId,
+              voiceEligible,
             },
           });
 
@@ -473,15 +697,25 @@ export async function POST(request: Request) {
             conversationId: conversation.id,
             messageId: assistantMessage.id,
             personaId: persona.id,
-            model: "gpt-4o-mini",
+            model: finalAnswer.metadata?.model,
             latencyMs: Date.now() - startedAt,
             payload: {
-              userQuery: content,
-              transcript: content,
+              contentLength: content.length,
+              firstTokenLatencyMs,
+              finalStatus: "completed",
+              historyMessages: history.length,
+              interactionMode,
               retrievedChunks: ragResult?.chunks.map((chunk) => ({
                 id: chunk.id,
                 canonicalRef: chunk.canonicalRef,
                 sourceTitle: chunk.sourceTitle,
+                chapter: chunk.chapter,
+                verseStart: chunk.verseStart,
+                verseEnd: chunk.verseEnd,
+                edition: chunk.sourceEdition,
+                translator: chunk.sourceTranslator,
+                attribution: chunk.sourceAttribution,
+                sourceUrl: chunk.sourceUrl,
                 score: chunk.score,
                 similarityScore: chunk.vectorScore,
                 keywordRank: chunk.keywordRank,
@@ -489,6 +723,13 @@ export async function POST(request: Request) {
               })),
               finalCitations: finalAnswer.citations,
               grounding: finalAnswer.grounding,
+              uncertainty: finalAnswer.uncertainty,
+              evidence: ragResult?.evidence,
+              provider: finalAnswer.metadata?.provider,
+              requestId: finalAnswer.metadata?.requestId,
+              tokenUsage: finalAnswer.metadata?.usage,
+              retrievedChunkCount: ragResult?.chunks.length ?? 0,
+              turnId,
             },
           });
 
@@ -498,25 +739,36 @@ export async function POST(request: Request) {
                 type: "assistant-message",
                 message: serializeMessage(assistantMessage),
                 spokenAnswer: finalAnswer.spokenAnswer,
+                voiceEligible,
                 citations: finalAnswer.citations,
                 traceId,
+                turnId,
                 ...(isDevMode && ragResult?.debug
                   ? { ragDebug: ragResult.debug }
                   : {}),
               }),
             ),
           );
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(doneEvent({ status: "completed", traceId, turnId })),
+            ),
+          );
           controller.close();
         } catch (error) {
           if (abortSignal.aborted) {
+            controller.enqueue(
+              encoder.encode(
+                streamEvent(
+                  doneEvent({ status: "cancelled", traceId, turnId }),
+                ),
+              ),
+            );
             controller.close();
             return;
           }
 
-          const message =
-            error instanceof AIError
-              ? `${error.code}: ${error.message}`
-              : "The assistant response failed. Please try again.";
+          const message = getAIUserFacingMessage(error);
 
           void logObservabilityEvent({
             traceId,
@@ -527,9 +779,14 @@ export async function POST(request: Request) {
             personaId: persona.id,
             latencyMs: Date.now() - startedAt,
             payload: {
-              userQuery: content,
-              transcript: content,
-              error: error instanceof Error ? error.message : String(error),
+              contentLength: content.length,
+              errorClass:
+                error instanceof Error
+                  ? error.constructor.name
+                  : "UnknownError",
+              finalStatus: "failed",
+              interactionMode,
+              turnId,
             },
           });
 
@@ -537,9 +794,16 @@ export async function POST(request: Request) {
             encoder.encode(
               streamEvent({
                 type: "error",
+                code: localAIErrorCode(error),
                 error: message,
                 traceId,
+                turnId,
               }),
+            ),
+          );
+          controller.enqueue(
+            encoder.encode(
+              streamEvent(doneEvent({ status: "failed", traceId, turnId })),
             ),
           );
           controller.close();
@@ -547,7 +811,28 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(stream, {
+    const wrappedStream = new ReadableStream({
+      async start(controller) {
+        const reader = stream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+          controller.close();
+        } catch (e) {
+          controller.error(e);
+        } finally {
+          release();
+        }
+      },
+      cancel() {
+        release();
+      },
+    });
+
+    return new Response(wrappedStream, {
       headers: {
         "Cache-Control": "no-cache, no-transform",
         "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -558,6 +843,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    release();
     throw error;
   }
 }

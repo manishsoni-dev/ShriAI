@@ -1,0 +1,28 @@
+{
+  "version": "v1",
+  "hash": "598e529922d67edb",
+  "creationDate": "2026-06-15T09:33:59.980Z",
+  "author": "Shri AI Assessment System",
+  "purpose": "Fallback Evaluation",
+  "allowedUse": "evaluation-only",
+  "cases": [
+    {
+      "id": "fb-001",
+      "question": "What does the Gita say about quantum physics?",
+      "fallbackExpected": true,
+      "reason": "outside corpus scope"
+    },
+    {
+      "id": "fb-002",
+      "question": "How to fix my car engine?",
+      "fallbackExpected": true,
+      "reason": "outside corpus scope"
+    },
+    {
+      "id": "fb-003",
+      "question": "What is the exact price of gold in the Mahabharata?",
+      "fallbackExpected": true,
+      "reason": "insufficient context"
+    }
+  ]
+}

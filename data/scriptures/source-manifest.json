@@ -1,0 +1,34 @@
+{
+  "version": "1.0.0",
+  "sources": [
+    {
+      "id": "bhagavad-gita-besant-1922",
+      "slug": "bhagavad-gita",
+      "canonicalTitle": "Bhagavad Gita",
+      "tradition": "Vaishnava",
+      "edition": "Bhagavad-Gita, 4th edition (1922)",
+      "translator": "Annie Wood Besant",
+      "language": "sanskrit",
+      "rightsStatus": "public_domain",
+      "license": "Public domain",
+      "attribution": "Annie Besant, Bhagavad-Gita, 4th edition (1922), source text accessed through Wikisource.",
+      "sourceUrl": "https://en.wikisource.org/wiki/Bhagavad-Gita_(Besant_4th)",
+      "ingestionDate": "2026-06-12",
+      "priority": 10
+    },
+    {
+      "id": "isha-upanishad-paramananda-1919",
+      "slug": "isha-upanishad",
+      "canonicalTitle": "Isha Upanishad",
+      "tradition": "Vedanta",
+      "edition": "The Upanishads, Volume 1 (1919)",
+      "translator": "Swami Paramananda",
+      "language": "sanskrit",
+      "rightsStatus": "public_domain",
+      "license": "Public domain",
+      "attribution": "Swami Paramananda, The Upanishads, Volume 1 (1919).",
+      "ingestionDate": "2026-06-16",
+      "priority": 10
+    }
+  ]
+}

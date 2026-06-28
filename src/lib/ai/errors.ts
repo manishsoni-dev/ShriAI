@@ -1,4 +1,7 @@
 export type AIErrorCode =
+  | "AI_TIMEOUT"
+  | "AI_UNAVAILABLE"
+  | "AI_INVALID_RESPONSE"
   | "AI_AUTHENTICATION_ERROR"
   | "AI_BAD_REQUEST"
   | "AI_RATE_LIMITED"
@@ -55,6 +58,26 @@ export function normalizeAIError(error: unknown, provider: string): AIError {
   const status = readStatus(error);
   const message = readMessage(error);
 
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return new AIError({
+      code: "AI_TIMEOUT",
+      message: "The local AI request timed out.",
+      provider,
+      retryable: true,
+      cause: error,
+    });
+  }
+
+  if (error instanceof TypeError && status === undefined) {
+    return new AIError({
+      code: "AI_UNAVAILABLE",
+      message: "The local AI service is unavailable.",
+      provider,
+      retryable: true,
+      cause: error,
+    });
+  }
+
   if (status === 401 || status === 403) {
     return new AIError({
       code: "AI_AUTHENTICATION_ERROR",
@@ -103,4 +126,28 @@ export function normalizeAIError(error: unknown, provider: string): AIError {
     provider,
     cause: error,
   });
+}
+
+export function getAIUserFacingMessage(error: unknown) {
+  if (!(error instanceof AIError)) {
+    return "The local AI response failed. Please try again.";
+  }
+
+  if (error.code === "AI_TIMEOUT") {
+    return "The local AI model took too long to respond. Please try again.";
+  }
+
+  if (error.code === "AI_UNAVAILABLE") {
+    return "Local AI is unavailable. Start Ollama and confirm the configured model is installed.";
+  }
+
+  if (error.code === "AI_INVALID_RESPONSE") {
+    return "The local AI model returned an invalid response. Please try again.";
+  }
+
+  if (error.code === "AI_BAD_REQUEST") {
+    return error.message;
+  }
+
+  return "The local AI response failed. Please try again.";
 }

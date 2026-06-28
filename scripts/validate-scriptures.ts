@@ -4,10 +4,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { scriptureFileSchema } from "../src/lib/rag/scripture-schema";
-
-const APPROVED_SOURCE_URL_PREFIXES = [
-  "https://en.wikisource.org/wiki/Bhagavad-Gita_(Besant_4th)",
-];
+import {
+  getManifestSource,
+  isManifestSourceEligible,
+} from "../src/lib/rag/source-manifest";
 
 const args = process.argv.slice(2);
 const includeSamples = args.includes("--include-samples");
@@ -26,7 +26,7 @@ function findJsonFiles(dir: string): string[] {
 
     if (stat.isDirectory()) {
       results = results.concat(findJsonFiles(fullPath));
-    } else if (file.endsWith(".json")) {
+    } else if (file.endsWith(".json") && file !== "source-manifest.json") {
       results.push(fullPath);
     }
   }
@@ -78,6 +78,23 @@ async function main() {
       continue;
     }
 
+    const dirName = path.basename(path.dirname(filePath));
+    const fileName = path.basename(filePath, ".json");
+    const slug = dirName === "scriptures" ? fileName : dirName;
+    let manifestSource;
+    try {
+      manifestSource = getManifestSource({ slug });
+    } catch (error) {
+      fail(`${filePath}: ${String(error)}`);
+      continue;
+    }
+    if (!isManifestSourceEligible(manifestSource)) {
+      fail(
+        `${filePath}: manifest source is not legally eligible for ingestion`,
+      );
+      continue;
+    }
+
     for (const record of result.data) {
       totalRecords++;
 
@@ -91,18 +108,22 @@ async function main() {
       }
 
       if (
-        record.sourceUrl &&
-        !APPROVED_SOURCE_URL_PREFIXES.some((prefix) =>
-          record.sourceUrl!.startsWith(prefix),
-        )
+        record.source !== manifestSource.canonicalTitle ||
+        record.language !== manifestSource.language
       ) {
         fail(
-          `${record.canonicalRef}: unapproved sourceUrl ${record.sourceUrl}`,
+          `${record.canonicalRef}: source title/language differs from manifest`,
         );
       }
 
-      if (record.copyrightStatus !== "public_domain") {
-        fail(`${record.canonicalRef}: copyrightStatus must be public_domain`);
+      if (
+        record.sourceUrl &&
+        (!manifestSource.sourceUrl ||
+          !record.sourceUrl.startsWith(manifestSource.sourceUrl))
+      ) {
+        fail(
+          `${record.canonicalRef}: sourceUrl differs from manifest authority`,
+        );
       }
     }
 

@@ -74,6 +74,7 @@ beforeEach(() => {
     id: OWNER_ID,
     email: "owner@example.com",
     name: "Owner",
+    onboardedAt: new Date(),
   });
   mocks.ensureDefaultWorkspace.mockResolvedValue({
     id: "workspace-owner",

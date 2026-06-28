@@ -7,17 +7,54 @@ datasource db {
 }
 
 model User {
-  id                String            @id @default(cuid())
-  email             String            @unique
-  name              String?
-  imageUrl          String?
-  passwordHash      String
-  workspaceMember   WorkspaceMember[]
-  conversations     Conversation[]
-  usageEvents       UsageEvent[]
-  uploadedDocuments Document[]        @relation("DocumentUploadedBy")
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id                         String              @id @default(cuid())
+  supabaseAuthUserId         String?             @unique @db.Uuid
+  email                      String              @unique
+  name                       String?
+  imageUrl                   String?
+  passwordHash               String
+  workspaceMember            WorkspaceMember[]
+  conversations              Conversation[]
+  usageEvents                UsageEvent[]
+  feedbacks                  UserFeedback[]
+  uploadedDocuments          Document[]          @relation("DocumentUploadedBy")
+  languagePreference         String              @default("auto")
+  /// Tradition/source scope preference for retrieval filtering (e.g. "vaishnava", "shaiva", "universal", "any")
+  sourceScope                String              @default("any")
+  microphoneConsentGivenAt   DateTime?
+  microphoneConsentVersion   String?
+  onboardedAt                DateTime?
+  researchConsentGivenAt     DateTime?
+  researchConsentVersion     String?
+  researchConsentWithdrawnAt DateTime?
+  studyModeEnabled           Boolean             @default(false)
+  savedAnswers               SavedAnswer[]
+  reflections                Reflection[]
+  productEvents              ProductEvent[]
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+  betaInvite                 BetaInvite?         @relation("UserBetaInvite")
+  sentInvites                BetaInvite[]        @relation("Inviter")
+  supportTickets             BetaSupportTicket[]
+}
+
+model BetaInvite {
+  id         String    @id @default(cuid())
+  email      String    @unique
+  inviterId  String?
+  status     String    @default("pending") // pending, accepted, revoked, expired
+  expiresAt  DateTime?
+  acceptedAt DateTime?
+  userId     String?   @unique
+
+  user    User? @relation("UserBetaInvite", fields: [userId], references: [id])
+  inviter User? @relation("Inviter", fields: [inviterId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
 }
 
 model Workspace {
@@ -54,17 +91,18 @@ enum WorkspaceRole {
 }
 
 model Conversation {
-  id          String       @id @default(cuid())
+  id          String         @id @default(cuid())
   title       String?
   metadata    Json?
   workspaceId String
   userId      String
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages    Message[]
   usageEvents UsageEvent[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  feedbacks   UserFeedback[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
   @@index([workspaceId])
   @@index([userId])
@@ -73,14 +111,16 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(cuid())
+  id             String           @id @default(cuid())
   role           MessageRole
   content        String
   metadata       Json?
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  citations      AnswerCitation[]
+  feedbacks      UserFeedback[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([conversationId])
   @@index([createdAt])
@@ -152,6 +192,7 @@ enum VoiceQaRunStatus {
   passed
   failed
   partial
+  invalid
 }
 
 enum VoiceQaStepStatus {
@@ -161,21 +202,29 @@ enum VoiceQaStepStatus {
   skipped
 }
 
+enum VoiceQaEvidenceSource {
+  manual
+  automated_fixture
+}
+
 model VoiceQaRun {
-  id          String           @id @default(cuid())
-  label       String
-  device      String?
-  browser     String?
-  personaId   String?
-  status      VoiceQaRunStatus @default(pending)
-  notes       String?
-  startedAt   DateTime         @default(now())
-  completedAt DateTime?
-  steps       VoiceQaStep[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id             String                @id @default(cuid())
+  label          String
+  device         String?
+  browser        String?
+  personaId      String?
+  status         VoiceQaRunStatus      @default(pending)
+  evidenceSource VoiceQaEvidenceSource @default(manual)
+  notes          String?
+  startedAt      DateTime              @default(now())
+  completedAt    DateTime?
+  invalidatedAt  DateTime?
+  steps          VoiceQaStep[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
   @@index([status])
+  @@index([evidenceSource])
   @@index([personaId])
   @@index([startedAt])
 }
@@ -244,17 +293,32 @@ enum DocumentStatus {
 }
 
 model DocumentChunk {
-  id          String                       @id @default(cuid())
-  documentId  String
-  workspaceId String
-  chunkIndex  Int
-  content     String
-  metadata    Json?
-  embedding   Unsupported("vector(1536)")?
-  document    Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  workspace   Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  createdAt   DateTime                     @default(now())
-  updatedAt   DateTime                     @updatedAt
+  id                   String                       @id @default(cuid())
+  documentId           String
+  workspaceId          String
+  sourceId             String?
+  scriptureName        String?
+  chapter              Int?
+  verseStart           Int?
+  verseEnd             Int?
+  language             String?
+  chunkIndex           Int
+  content              String
+  normalizedText       String?
+  tokenCount           Int?
+  chunkHash            String?
+  metadata             Json?
+  reviewStatus         ScriptureReviewStatus        @default(pending)
+  embedding            Unsupported("vector(1024)")?
+  embeddingProvider    String?
+  embeddingModel       String?
+  embeddingDimensions  Int?
+  embeddingVersion     String?
+  embeddingGeneratedAt DateTime?
+  document             Document                     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  workspace            Workspace                    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
 
   @@unique([documentId, chunkIndex])
   @@index([documentId])
@@ -266,22 +330,33 @@ model DocumentChunk {
 
 /// One canonical text (e.g. "Bhagavad Gita"). Priority 1–10 (10 = most authoritative).
 model ScriptureSource {
-  id              String           @id @default(cuid())
+  id                             String                @id @default(cuid())
   /// e.g. "Bhagavad Gita", "Valmiki Ramayana"
-  canonicalTitle  String           @unique
+  canonicalTitle                 String                @unique
+  sourceName                     String?
   /// e.g. "Vaishnava", "Shaiva", "Universal"
-  tradition       String
+  tradition                      String
   /// Primary language of the original text
-  language        String           @default("sanskrit")
+  language                       String                @default("sanskrit")
   /// "public_domain", "licensed", "fair_use"
-  copyrightStatus String           @default("public_domain")
+  copyrightStatus                String                @default("public_domain")
+  manifestId                     String?               @unique
+  edition                        String?
+  translator                     String?
+  licenseOrUsageBasis            String?
+  attributionText                String?
+  sourceUrlOrProvenanceReference String?
+  ingestionDate                  DateTime?
+  reviewStatus                   ScriptureReviewStatus @default(pending)
+  reviewedBy                     String?
+  reviewedAt                     DateTime?
   /// 1–10 — used to boost retrieval score (10 = highest priority)
-  priority        Int              @default(5)
+  priority                       Int                   @default(5)
   /// Source-level eligibility switch for production retrieval.
-  active          Boolean          @default(true)
-  chunks          ScriptureChunk[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  active                         Boolean               @default(true)
+  chunks                         ScriptureChunk[]
+  createdAt                      DateTime              @default(now())
+  updatedAt                      DateTime              @updatedAt
 
   @@index([tradition])
   @@index([priority])
@@ -290,45 +365,62 @@ model ScriptureSource {
 
 /// One verse, doha, passage, or thematic chunk from a scripture source.
 model ScriptureChunk {
-  id              String                       @id @default(cuid())
-  sourceId        String
+  id                   String                       @id @default(cuid())
+  sourceId             String
+  documentId           String?
+  workspaceId          String?
+  scriptureName        String?
   /// Canonical reference string, e.g. "2.47", "Sundara Kanda 1.1"
-  canonicalRef    String
+  canonicalRef         String
+  chapter              Int                          @default(1)
+  verseStart           Int                          @default(1)
+  verseEnd             Int                          @default(1)
   /// Primary language of the originalText field
-  language        String                       @default("sanskrit")
+  language             String                       @default("sanskrit")
   /// Devanagari / original script
-  originalText    String?
+  originalText         String?
   /// IAST / ISO 15919 transliteration
-  transliteration String?
+  transliteration      String?
   /// English translation
-  translation     String
+  translation          String
+  normalizedText       String?
+  tokenCount           Int?
+  chunkHash            String?
   /// Scholarly or devotional commentary
-  commentary      String?
+  commentary           String?
   /// Practical application — used in answer planning
-  practicalNote   String?
+  practicalNote        String?
   /// Persona IDs this chunk is primarily associated with (e.g. ["krishna"])
-  personaTags     String[]
+  personaTags          String[]
   /// Thematic tags (e.g. ["karma", "duty", "detachment"])
-  themeTags       String[]
+  themeTags            String[]
   /// Emotional/situational tags (e.g. ["confusion", "grief", "fear_of_failure"])
-  emotionTags     String[]
+  emotionTags          String[]
   /// Use-case labels (e.g. ["career confusion", "dealing with loss"])
-  answerUseCases  String[]
-  /// OpenAI embedding of translation + commentary combined
-  embedding       Unsupported("vector(1536)")?
+  answerUseCases       String[]
+  /// Local Ollama embedding of translation + commentary combined
+  embedding            Unsupported("vector(1024)")?
+  embeddingProvider    String?
+  embeddingModel       String?
+  embeddingDimensions  Int?
+  embeddingVersion     String?
+  embeddingGeneratedAt DateTime?
+  embeddingCorpusHash  String?
+  embeddingNormalized  Boolean?
   /// PostgreSQL full-text search vector (auto-maintained by DB trigger)
-  searchVector    Unsupported("tsvector")?
-  source          ScriptureSource              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
-  citations       AnswerCitation[]
-  reviews         ScriptureChunkReview[]
-  reviewAudits    ScriptureChunkReviewAudit[]
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
+  searchVector         Unsupported("tsvector")?
+  source               ScriptureSource              @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  citations            AnswerCitation[]
+  reviews              ScriptureChunkReview[]
+  reviewAudits         ScriptureChunkReviewAudit[]
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
 
   @@unique([sourceId, canonicalRef])
   @@index([sourceId])
   @@index([personaTags])
   @@index([themeTags])
+  @@index([chapter, verseStart, verseEnd])
 }
 
 enum ScriptureReviewStatus {
@@ -337,23 +429,27 @@ enum ScriptureReviewStatus {
   approved
   rejected
   needs_changes
+  needs_revision
 }
 
 /// Human theological/source review for a scripture chunk before broad voice use.
 model ScriptureChunkReview {
-  id                  String                @id @default(cuid())
-  chunkId             String                @unique
-  reviewStatus        ScriptureReviewStatus @default(pending)
+  id                  String                      @id @default(cuid())
+  chunkId             String                      @unique
+  reviewStatus        ScriptureReviewStatus       @default(pending)
+  reviewOrigin        String                      @default("human")
   reviewedBy          String?
   reviewedAt          DateTime?
+  invalidatedAt       DateTime?
+  invalidationReason  String?
   accuracyScore       Int?
   interpretationNotes String?
   rejectionReason     String?
-  approvedForVoice    Boolean               @default(false)
-  chunk               ScriptureChunk        @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  approvedForVoice    Boolean                     @default(false)
+  chunk               ScriptureChunk              @relation(fields: [chunkId], references: [id], onDelete: Cascade)
   audits              ScriptureChunkReviewAudit[]
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
 
   @@index([reviewStatus])
   @@index([approvedForVoice])
@@ -362,18 +458,18 @@ model ScriptureChunkReview {
 
 /// Immutable audit trail for scripture chunk review decisions.
 model ScriptureChunkReviewAudit {
-  id                         String                 @id @default(cuid())
-  reviewId                   String
-  scriptureChunkId           String
-  previousStatus             ScriptureReviewStatus?
-  nextStatus                 ScriptureReviewStatus
-  previousApprovedForVoice   Boolean?
-  nextApprovedForVoice       Boolean
-  reviewerUserId             String
-  notes                      String?
-  review                     ScriptureChunkReview   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
-  scriptureChunk             ScriptureChunk         @relation(fields: [scriptureChunkId], references: [id], onDelete: Cascade)
-  createdAt                  DateTime               @default(now())
+  id                       String                 @id @default(cuid())
+  reviewId                 String
+  scriptureChunkId         String
+  previousStatus           ScriptureReviewStatus?
+  nextStatus               ScriptureReviewStatus
+  previousApprovedForVoice Boolean?
+  nextApprovedForVoice     Boolean
+  reviewerUserId           String
+  notes                    String?
+  review                   ScriptureChunkReview   @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  scriptureChunk           ScriptureChunk         @relation(fields: [scriptureChunkId], references: [id], onDelete: Cascade)
+  createdAt                DateTime               @default(now())
 
   @@index([reviewId])
   @@index([scriptureChunkId])
@@ -404,8 +500,150 @@ model AnswerCitation {
   chunkId   String
   score     Float?
   chunk     ScriptureChunk @relation(fields: [chunkId], references: [id], onDelete: Cascade)
+  message   Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
   createdAt DateTime       @default(now())
 
   @@index([messageId])
   @@index([chunkId])
+}
+
+enum FeedbackLabel {
+  helpful
+  not_helpful
+  citation_issue
+  unsafe
+  confusing
+}
+
+/// Privacy-safe user feedback on model responses.
+model UserFeedback {
+  id                     String          @id @default(cuid())
+  userId                 String
+  conversationId         String
+  messageId              String
+  personaId              String?
+  traceId                String?
+  modelConfiguration     String?
+  retrievalConfiguration String?
+  labels                 FeedbackLabel[]
+  notes                  String? // optional free-text
+  triageStatus           String          @default("new") // new, investigating, accepted, fixed, cannot_reproduce, rejected, duplicate
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message      Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([messageId])
+}
+
+model BetaSupportTicket {
+  id              String   @id @default(cuid())
+  userId          String
+  issueCategory   String
+  traceId         String?
+  timestamp       DateTime @default(now())
+  browser         String?
+  os              String?
+  deviceClass     String?
+  persona         String?
+  interactionMode String?
+  description     String
+  status          String   @default("open") // open, investigating, resolved, closed
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Phase 5: User-value loop models ────────────────────────────────────────
+
+/// A user-saved assistant answer for later reference. Private to user + workspace.
+model SavedAnswer {
+  id             String       @id @default(cuid())
+  userId         String
+  workspaceId    String
+  conversationId String
+  messageId      String
+  personaId      String?
+  /// Snapshot of the answer content at save time (not updated if the message changes)
+  answerSnapshot String
+  /// Number of citations on the answer at save time
+  citationCount  Int          @default(0)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reflections    Reflection[]
+  createdAt      DateTime     @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([userId, workspaceId])
+  @@index([messageId])
+}
+
+/// A private user reflection attached to a saved answer. Never used in analytics.
+model Reflection {
+  id            String      @id @default(cuid())
+  userId        String
+  savedAnswerId String
+  /// User-authored note text — private, never logged to analytics
+  body          String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  savedAnswer   SavedAnswer @relation(fields: [savedAnswerId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([savedAnswerId])
+}
+
+/// Privacy-safe internal product analytics events. Raw prompt, answer, or audio MUST NOT be stored here.
+model ProductEvent {
+  id          String   @id @default(cuid())
+  eventType   String
+  userId      String?
+  workspaceId String?
+  personaId   String?
+  traceId     String?
+  /// Safe structured metadata only — no raw question/answer text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([createdAt])
+}
+
+/// Internal tracking for usability testing defects and blockers
+model UsabilityDefect {
+  id                String   @id @default(cuid())
+  /// "blocker" | "high" | "medium" | "low"
+  severity          String
+  workflowStage     String
+  reproductionSteps String
+  affectedDevice    String?
+  /// Reference to ProductEvent traceId or id
+  linkedEventId     String?
+  /// "open" | "investigating" | "resolved" | "closed"
+  resolutionStatus  String   @default("open")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([severity])
+  @@index([resolutionStatus])
+}
+
+/// Server-side feature flags for beta rollout control
+model FeatureFlag {
+  name        String   @id // e.g. "voice_input", "document_upload"
+  enabled     Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String? // Admin userId who last toggled it
 }

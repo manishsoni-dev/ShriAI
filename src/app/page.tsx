@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { CosmicOrbitEngine } from "@/app/_components/CosmicOrbitEngine";
 import {
   PageShell,
   PersonasGrid,
@@ -33,11 +32,6 @@ export default function Home() {
   return (
     <PageShell>
       <section className="relative mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center gap-10 px-5 py-14 md:grid-cols-[1.05fr_0.95fr] md:px-8">
-        <CosmicOrbitEngine
-          centerYRatio={0.38}
-          className="pointer-events-none absolute inset-0 z-0 h-full w-full"
-          opacity={0.62}
-        />
         <div className="relative z-10">
           <SectionLabel>Divine Persona AI</SectionLabel>
           <h1 className="mt-5 max-w-4xl font-serif text-5xl font-semibold leading-[0.98] text-amber-50 md:text-7xl">
@@ -114,7 +108,7 @@ export default function Home() {
         <div className="grid gap-4 sm:grid-cols-2">
           {guidanceSteps.map(([title, body]) => (
             <article
-              className="rounded-lg border border-amber-200/12 bg-[#110b08]/72 p-5"
+              className="rounded-lg border border-amber-200/12 bg-[var(--card-surface)] p-5"
               key={title}
             >
               <h3 className="font-serif text-2xl font-semibold text-amber-50">

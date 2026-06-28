@@ -7,15 +7,91 @@ services:
       POSTGRES_DB: shri_ai
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    ports:
-      - "5432:5432"
+    # Port intentionally NOT exposed to host for security
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    networks:
+      - internal
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d shri_ai"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  voice:
+    build:
+      context: ./services/voice
+    container_name: shri-ai-voice
+    restart: unless-stopped
+    environment:
+      STT_SERVICE_TOKEN: ${STT_SERVICE_TOKEN:?Set STT_SERVICE_TOKEN}
+      STT_MODEL: ${STT_MODEL:-small}
+      WHISPER_DEVICE: ${WHISPER_DEVICE:-cpu}
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8}
+      VOICE_MAX_AUDIO_BYTES: 10485760
+      VOICE_MAX_AUDIO_SECONDS: 90
+      VOICE_INFERENCE_TIMEOUT_SECONDS: 90
+    # Port intentionally NOT exposed to host for security
+    volumes:
+      - voice-models:/models
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  nextjs:
+    build:
+      context: .
+    container_name: shri-ai-nextjs
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/shri_ai?schema=public
+      - AUTH_SECRET=${AUTH_SECRET:?Set AUTH_SECRET}
+      - STT_BASE_URL=http://voice:8080
+      - STT_SERVICE_TOKEN=${STT_SERVICE_TOKEN:?Set STT_SERVICE_TOKEN}
+      # Point to host Ollama using host.docker.internal (or equivalent depending on OS/Docker version)
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - SHRI_AI_CHAT_MODEL=${SHRI_AI_CHAT_MODEL:-qwen3:8b}
+      - SHRI_AI_EMBEDDING_MODEL=${SHRI_AI_EMBEDDING_MODEL:-qwen3-embedding:0.6b}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      voice:
+        condition: service_healthy
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: shri-ai-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - internal
+    depends_on:
+      - nextjs
+
+networks:
+  internal:
+    driver: bridge
+
 volumes:
   postgres-data:
+  voice-models:
+  caddy-data:
+  caddy-config:

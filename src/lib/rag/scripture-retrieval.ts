@@ -6,6 +6,7 @@ import { toPgVectorLiteral } from "@/lib/ingestion/vector";
 import { logObservabilityEvent } from "@/lib/observability";
 import type { PersonaId } from "@/lib/personas";
 import { buildScriptureKeywordQuery } from "@/lib/rag/retrieval-query";
+import { getActiveExperimentConfig } from "@/lib/rag/experiment-config";
 
 // ── Persona → primary source filter ──────────────────────────────────────────
 // Soft filter: if persona-specific retrieval returns < MIN_PERSONA_RESULTS,
@@ -21,7 +22,7 @@ const PERSONA_SOURCE_MAP: Record<PersonaId, string[]> = {
 };
 
 const MIN_PERSONA_RESULTS = 2; // If fewer than this, broaden to global
-const VOICE_ALLOWED_COPYRIGHT_STATUSES = [
+const ALLOWED_COPYRIGHT_STATUSES = [
   "public_domain",
   "public-domain",
   "licensed",
@@ -32,9 +33,18 @@ const VOICE_ALLOWED_COPYRIGHT_STATUSES = [
 export type ScriptureChunkResult = {
   id: string;
   canonicalRef: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
   sourceTitle: string;
+  sourceEdition: string | null;
+  sourceTranslator: string | null;
+  sourceAttribution: string | null;
+  sourceUrl: string | null;
   sourcePriority: number;
   translation: string;
+  originalText?: string | null;
+  transliteration?: string | null;
   commentary: string | null;
   practicalNote: string | null;
   personaTags: string[];
@@ -45,6 +55,13 @@ export type ScriptureChunkResult = {
   keywordRank: number;
 };
 
+export type EvidenceConfidence = {
+  score: number;
+  level: "strong" | "limited" | "insufficient";
+  threshold: number;
+  reason: string;
+};
+
 export type ScriptureRetrievalResult = {
   chunks: ScriptureChunkResult[];
   citations: Array<{ ref: string; source: string }>;
@@ -53,6 +70,7 @@ export type ScriptureRetrievalResult = {
   usedFallback: boolean;
   insufficientContext: boolean;
   insufficientApprovedContext: boolean;
+  evidence: EvidenceConfidence;
   /** Debug info — only populated when debugMode is true */
   debug?: {
     queryEmbeddingMs: number;
@@ -61,6 +79,11 @@ export type ScriptureRetrievalResult = {
     totalMs: number;
     sourceFilter: string[];
     retrievedCount: number;
+    vectorCandidates: number;
+    keywordCandidates: number;
+    mergedCandidates: number;
+    filteredCandidates: number;
+    rerankedCandidates: number;
   };
 };
 
@@ -90,9 +113,18 @@ export type RetrieveScriptureContextInput = {
 type ScriptureRowBase = {
   id: string;
   canonicalRef: string;
+  chapter: number;
+  verseStart: number;
+  verseEnd: number;
   sourceTitle: string;
+  sourceEdition: string | null;
+  sourceTranslator: string | null;
+  sourceAttribution: string | null;
+  sourceUrl: string | null;
   sourcePriority: number;
   translation: string;
+  originalText?: string | null;
+  transliteration?: string | null;
   commentary: string | null;
   practicalNote: string | null;
   personaTags: string[];
@@ -138,6 +170,10 @@ async function retrieveScriptureContextInner(
   t0: number,
   mode: ScriptureRetrievalMode,
 ): Promise<ScriptureRetrievalResult> {
+  const config = getActiveExperimentConfig();
+  const vectorLimit = config.vectorCandidateCount;
+  const keywordLimit = config.keywordCandidateCount;
+  limit = Math.min(limit, config.finalTopK);
   // ── 1. Embed the query ──────────────────────────────────────────────────────
   const t1 = Date.now();
   let queryVector: string;
@@ -163,25 +199,30 @@ async function retrieveScriptureContextInner(
     vectorRows = await vectorSearchPersona(
       queryVector,
       input.personaId,
-      limit * 2, // over-fetch for reranking
+      vectorLimit,
       mode,
+      config,
     );
 
     if (vectorRows.length < MIN_PERSONA_RESULTS) {
       // Broaden: search all chunks regardless of persona
       usedFallback = true;
-      vectorRows = await vectorSearchGlobal(queryVector, limit * 2, mode);
+      vectorRows = await vectorSearchGlobal(
+        queryVector,
+        vectorLimit,
+        mode,
+        config,
+      );
     }
   }
 
   const vectorMs = Date.now() - t2;
 
-  // ── 3. Keyword search (BM25-style via tsvector) ─────────────────────────────
   const t3 = Date.now();
   const keywordRows = await keywordSearch(
     query,
     input.personaId,
-    limit * 3,
+    keywordLimit,
     input.themes,
     mode,
   );
@@ -191,20 +232,52 @@ async function retrieveScriptureContextInner(
   const merged = mergeAndRerank(vectorRows, keywordRows, limit, input.themes);
 
   // ── 4.5 Threshold + Deduplication ───────────────────────────────────────────
-  const threshold = input.threshold ?? 0;
-  let finalChunks = merged.filter((c) => c.score >= threshold);
+  const answerThreshold = Math.max(
+    input.threshold ?? config.minimumAnswerConfidence,
+    config.minimumAnswerConfidence,
+  );
+  let finalChunks = merged.filter(
+    (c) =>
+      c.score >= answerThreshold &&
+      (c.vectorScore >= config.minimumVectorScore || c.keywordRank > 0),
+  );
 
-  // Deduplicate adjacent/repeated references logically
-  const seenRefs = new Set<string>();
-  finalChunks = finalChunks.filter((c) => {
-    if (seenRefs.has(c.canonicalRef)) return false;
-    seenRefs.add(c.canonicalRef);
-    return true;
-  });
+  if (config.deduplicateContext) {
+    // Deduplicate adjacent/repeated references logically
+    const seenRefs = new Set<string>();
+    finalChunks = finalChunks.filter((c) => {
+      if (seenRefs.has(c.canonicalRef)) return false;
+      seenRefs.add(c.canonicalRef);
+      return true;
+    });
+  }
 
   const insufficientContext = finalChunks.length === 0;
   const insufficientApprovedContext =
     mode === "voice" && finalChunks.length === 0;
+  const topScore = Math.min(1, Math.max(0, finalChunks[0]?.score ?? 0));
+  const evidence: EvidenceConfidence =
+    finalChunks.length === 0
+      ? {
+          score: 0,
+          level: "insufficient",
+          threshold: answerThreshold,
+          reason: "No approved passage met the answer confidence threshold.",
+        }
+      : topScore >= config.strongEvidenceConfidence
+        ? {
+            score: topScore,
+            level: "strong",
+            threshold: answerThreshold,
+            reason: "Approved retrieved passages provide strong support.",
+          }
+        : {
+            score: topScore,
+            level: "limited",
+            threshold: answerThreshold,
+            reason:
+              "Approved passages are relevant, but the evidence is limited.",
+          };
 
   // ── 5. Log retrieval (fire and forget) ─────────────────────────────────────
   const totalMs = Date.now() - t0;
@@ -232,12 +305,14 @@ async function retrieveScriptureContextInner(
       personaId: input.personaId,
       latencyMs: totalMs,
       payload: {
-        query,
+        queryLength: query.length,
+        queryPreview: redactedQueryPreview(query),
         mode,
         sourceFilter,
         usedFallback,
         insufficientContext,
         insufficientApprovedContext,
+        evidence,
         retrievedChunkIds,
         selectedChunkIds: finalChunks.map((chunk) => chunk.id),
         scores: finalChunks.map((chunk) => ({
@@ -248,6 +323,7 @@ async function retrieveScriptureContextInner(
           keywordRank: chunk.keywordRank,
           rerankerScore: chunk.score,
         })),
+        experimentConfig: config.id,
       },
     });
   }
@@ -266,6 +342,7 @@ async function retrieveScriptureContextInner(
     usedFallback,
     insufficientContext,
     insufficientApprovedContext,
+    evidence,
     ...(input.debugMode
       ? {
           debug: {
@@ -275,6 +352,11 @@ async function retrieveScriptureContextInner(
             totalMs,
             sourceFilter,
             retrievedCount: retrievedChunkIds.length,
+            vectorCandidates: vectorRows.length,
+            keywordCandidates: keywordRows.length,
+            mergedCandidates: merged.length,
+            filteredCandidates: finalChunks.length,
+            rerankedCandidates: finalChunks.length,
           },
         }
       : {}),
@@ -288,14 +370,24 @@ async function vectorSearchPersona(
   personaId: PersonaId,
   limit: number,
   mode: ScriptureRetrievalMode,
+  config: ReturnType<typeof getActiveExperimentConfig>,
 ): Promise<VectorRow[]> {
   if (mode === "voice") {
     return db.$queryRaw<VectorRow[]>`
       SELECT
         sc."id",
         sc."canonicalRef",
+        sc."chapter",
+        sc."verseStart",
+        sc."verseEnd",
         ss."canonicalTitle" AS "sourceTitle",
+        ss."edition" AS "sourceEdition",
+        ss."translator" AS "sourceTranslator",
+        ss."attribution" AS "sourceAttribution",
+        ss."sourceUrl",
         ss."priority" AS "sourcePriority",
+        sc."originalText",
+        sc."transliteration",
         sc."translation",
         sc."commentary",
         sc."practicalNote",
@@ -307,11 +399,13 @@ async function vectorSearchPersona(
       INNER JOIN "ScriptureChunkReview" scr ON scr."chunkId" = sc."id"
       WHERE
         sc."embedding" IS NOT NULL
+        AND sc."embeddingModel" = ${config.embeddingModel}
+        AND sc."embeddingDimensions" = ${config.embeddingDimensions}
         AND sc."personaTags" @> ARRAY[${personaId}]::TEXT[]
         AND scr."reviewStatus" = 'approved'
         AND scr."approvedForVoice" = true
         AND ss."active" = true
-        AND ss."copyrightStatus" = ANY(${VOICE_ALLOWED_COPYRIGHT_STATUSES}::TEXT[])
+        AND ss."copyrightStatus" = ANY(${ALLOWED_COPYRIGHT_STATUSES}::TEXT[])
       ORDER BY sc."embedding" <=> ${queryVector}::vector
       LIMIT ${limit}
     `;
@@ -321,8 +415,17 @@ async function vectorSearchPersona(
     SELECT
       sc."id",
       sc."canonicalRef",
+      sc."chapter",
+      sc."verseStart",
+      sc."verseEnd",
       ss."canonicalTitle" AS "sourceTitle",
+      ss."edition" AS "sourceEdition",
+      ss."translator" AS "sourceTranslator",
+      ss."attribution" AS "sourceAttribution",
+      ss."sourceUrl",
       ss."priority" AS "sourcePriority",
+      sc."originalText",
+      sc."transliteration",
       sc."translation",
       sc."commentary",
       sc."practicalNote",
@@ -331,9 +434,15 @@ async function vectorSearchPersona(
       1 - (sc."embedding" <=> ${queryVector}::vector) AS "score"
     FROM "ScriptureChunk" sc
     INNER JOIN "ScriptureSource" ss ON ss."id" = sc."sourceId"
+    INNER JOIN "ScriptureChunkReview" scr ON scr."chunkId" = sc."id"
     WHERE
       sc."embedding" IS NOT NULL
+      AND sc."embeddingModel" = ${config.embeddingModel}
+      AND sc."embeddingDimensions" = ${config.embeddingDimensions}
       AND sc."personaTags" @> ARRAY[${personaId}]::TEXT[]
+      AND scr."reviewStatus" = 'approved'
+      AND ss."active" = true
+      AND ss."copyrightStatus" = ANY(${ALLOWED_COPYRIGHT_STATUSES}::TEXT[])
     ORDER BY sc."embedding" <=> ${queryVector}::vector
     LIMIT ${limit}
   `;
@@ -345,14 +454,24 @@ async function vectorSearchGlobal(
   queryVector: string,
   limit: number,
   mode: ScriptureRetrievalMode,
+  config: ReturnType<typeof getActiveExperimentConfig>,
 ): Promise<VectorRow[]> {
   if (mode === "voice") {
     return db.$queryRaw<VectorRow[]>`
       SELECT
         sc."id",
         sc."canonicalRef",
+        sc."chapter",
+        sc."verseStart",
+        sc."verseEnd",
         ss."canonicalTitle" AS "sourceTitle",
+        ss."edition" AS "sourceEdition",
+        ss."translator" AS "sourceTranslator",
+        ss."attribution" AS "sourceAttribution",
+        ss."sourceUrl",
         ss."priority" AS "sourcePriority",
+        sc."originalText",
+        sc."transliteration",
         sc."translation",
         sc."commentary",
         sc."practicalNote",
@@ -364,10 +483,12 @@ async function vectorSearchGlobal(
       INNER JOIN "ScriptureChunkReview" scr ON scr."chunkId" = sc."id"
       WHERE
         sc."embedding" IS NOT NULL
+        AND sc."embeddingModel" = ${config.embeddingModel}
+        AND sc."embeddingDimensions" = ${config.embeddingDimensions}
         AND scr."reviewStatus" = 'approved'
         AND scr."approvedForVoice" = true
         AND ss."active" = true
-        AND ss."copyrightStatus" = ANY(${VOICE_ALLOWED_COPYRIGHT_STATUSES}::TEXT[])
+        AND ss."copyrightStatus" = ANY(${ALLOWED_COPYRIGHT_STATUSES}::TEXT[])
       ORDER BY sc."embedding" <=> ${queryVector}::vector
       LIMIT ${limit}
     `;
@@ -377,8 +498,17 @@ async function vectorSearchGlobal(
     SELECT
       sc."id",
       sc."canonicalRef",
+      sc."chapter",
+      sc."verseStart",
+      sc."verseEnd",
       ss."canonicalTitle" AS "sourceTitle",
+      ss."edition" AS "sourceEdition",
+      ss."translator" AS "sourceTranslator",
+      ss."attribution" AS "sourceAttribution",
+      ss."sourceUrl",
       ss."priority" AS "sourcePriority",
+      sc."originalText",
+      sc."transliteration",
       sc."translation",
       sc."commentary",
       sc."practicalNote",
@@ -387,7 +517,14 @@ async function vectorSearchGlobal(
       1 - (sc."embedding" <=> ${queryVector}::vector) AS "score"
     FROM "ScriptureChunk" sc
     INNER JOIN "ScriptureSource" ss ON ss."id" = sc."sourceId"
-    WHERE sc."embedding" IS NOT NULL
+    INNER JOIN "ScriptureChunkReview" scr ON scr."chunkId" = sc."id"
+    WHERE
+      sc."embedding" IS NOT NULL
+      AND sc."embeddingModel" = ${config.embeddingModel}
+      AND sc."embeddingDimensions" = ${config.embeddingDimensions}
+      AND scr."reviewStatus" = 'approved'
+      AND ss."active" = true
+      AND ss."copyrightStatus" = ANY(${ALLOWED_COPYRIGHT_STATUSES}::TEXT[])
     ORDER BY sc."embedding" <=> ${queryVector}::vector
     LIMIT ${limit}
   `;
@@ -403,51 +540,36 @@ async function keywordSearch(
   mode: ScriptureRetrievalMode,
 ): Promise<KeywordRow[]> {
   const keywordQuery = buildScriptureKeywordQuery(query, themes);
-  const voiceJoin =
-    mode === "voice"
-      ? 'INNER JOIN "ScriptureChunkReview" scr ON scr."chunkId" = sc."id"'
-      : "";
   const voiceWhere =
-    mode === "voice"
-      ? `
+    mode === "voice" ? `AND scr."approvedForVoice" = true` : "";
+  const voicePersonaExistsWhere =
+    mode === "voice" ? `AND scr2."approvedForVoice" = true` : "";
+  const params = [
+    keywordQuery.tsQuery,
+    keywordQuery.themes,
+    keywordQuery.terms,
+    personaId,
+    limit,
+    ALLOWED_COPYRIGHT_STATUSES,
+  ];
+  const eligibilityWhere = `
         AND scr."reviewStatus" = 'approved'
-        AND scr."approvedForVoice" = true
+        ${voiceWhere}
         AND ss."active" = true
         AND ss."copyrightStatus" = ANY($6::TEXT[])
-      `
-      : "";
-  const voicePersonaExistsWhere =
-    mode === "voice"
-      ? `
+      `;
+  const personaExistsEligibilityWhere = `
               AND EXISTS (
                 SELECT 1
                 FROM "ScriptureChunkReview" scr2
                 INNER JOIN "ScriptureSource" ss2 ON ss2."id" = sc2."sourceId"
                 WHERE scr2."chunkId" = sc2."id"
                   AND scr2."reviewStatus" = 'approved'
-                  AND scr2."approvedForVoice" = true
+                  ${voicePersonaExistsWhere}
                   AND ss2."active" = true
                   AND ss2."copyrightStatus" = ANY($6::TEXT[])
               )
-      `
-      : "";
-  const params =
-    mode === "voice"
-      ? [
-          keywordQuery.tsQuery,
-          keywordQuery.themes,
-          keywordQuery.terms,
-          personaId,
-          limit,
-          VOICE_ALLOWED_COPYRIGHT_STATUSES,
-        ]
-      : [
-          keywordQuery.tsQuery,
-          keywordQuery.themes,
-          keywordQuery.terms,
-          personaId,
-          limit,
-        ];
+      `;
 
   try {
     const rows = await db.$queryRawUnsafe<KeywordRow[]>(
@@ -461,8 +583,17 @@ async function keywordSearch(
       SELECT
         sc."id",
         sc."canonicalRef",
+        sc."chapter",
+        sc."verseStart",
+        sc."verseEnd",
         ss."canonicalTitle" AS "sourceTitle",
+        ss."edition" AS "sourceEdition",
+        ss."translator" AS "sourceTranslator",
+        ss."attribution" AS "sourceAttribution",
+        ss."sourceUrl",
         ss."priority" AS "sourcePriority",
+        sc."originalText",
+        sc."transliteration",
         sc."translation",
         sc."commentary",
         sc."practicalNote",
@@ -496,7 +627,7 @@ async function keywordSearch(
         ) AS "keywordRank"
       FROM "ScriptureChunk" sc
       INNER JOIN "ScriptureSource" ss ON ss."id" = sc."sourceId"
-      ${voiceJoin}
+      INNER JOIN "ScriptureChunkReview" scr ON scr."chunkId" = sc."id"
       CROSS JOIN input
       WHERE
         (
@@ -513,14 +644,14 @@ async function keywordSearch(
             WHERE lower(use_case) LIKE '%' || term || '%'
           )
         )
-        ${voiceWhere}
+        ${eligibilityWhere}
         AND (
           sc."personaTags" @> ARRAY[$4::TEXT]
           OR NOT EXISTS (
             SELECT 1 FROM "ScriptureChunk" sc2
             CROSS JOIN input
             WHERE sc2."personaTags" @> ARRAY[$4::TEXT]
-              ${voicePersonaExistsWhere}
+              ${personaExistsEligibilityWhere}
               AND (
                 sc2."searchVector" @@ input.tsq
                 OR EXISTS (
@@ -553,6 +684,7 @@ function mergeAndRerank(
   limit: number,
   themes?: string[],
 ): ScriptureChunkResult[] {
+  const config = getActiveExperimentConfig();
   const safeVectorRows = Array.isArray(vectorRows) ? vectorRows : [];
   const safeKeywordRows = Array.isArray(keywordRows) ? keywordRows : [];
   const keywordMap = new Map<string, number>();
@@ -586,19 +718,28 @@ function mergeAndRerank(
       maxKeywordRank > 0 ? rawKeywordRank / maxKeywordRank : 0;
     const vectorScore = vec ? Number(vec.score) : 0;
     const sourcePriority = normalizePriority(row.sourcePriority);
-    const themeBoost = hasThemeMatch(row, themes) ? 0.05 : 0;
+    const themeBoost = hasThemeMatch(row, themes) ? config.themeMatchWeight : 0;
 
     const combinedScore =
-      0.62 * vectorScore +
-      0.28 * normalizedKeyword +
-      0.1 * sourcePriority +
+      config.vectorWeight * vectorScore +
+      config.keywordWeight * normalizedKeyword +
+      config.sourcePriorityWeight * sourcePriority +
       themeBoost;
 
     results.push({
       id,
       canonicalRef: row.canonicalRef,
+      chapter: row.chapter,
+      verseStart: row.verseStart,
+      verseEnd: row.verseEnd,
       sourceTitle: row.sourceTitle,
+      sourceEdition: row.sourceEdition,
+      sourceTranslator: row.sourceTranslator,
+      sourceAttribution: row.sourceAttribution,
+      sourceUrl: row.sourceUrl,
       sourcePriority: row.sourcePriority,
+      originalText: row.originalText,
+      transliteration: row.transliteration,
       translation: row.translation,
       commentary: row.commentary,
       practicalNote: row.practicalNote,
@@ -650,7 +791,7 @@ async function logRetrieval(input: {
   try {
     await db.retrievalLog.create({
       data: {
-        query: input.query.slice(0, 2000),
+        query: redactedQueryPreview(input.query),
         personaId: input.personaId,
         retrievedChunkIds: input.retrievedChunkIds,
         selectedChunkIds: input.selectedChunkIds,
@@ -662,6 +803,10 @@ async function logRetrieval(input: {
   } catch {
     // Never crash the chat request because of logging
   }
+}
+
+function redactedQueryPreview(query: string) {
+  return query.replace(/\s+/g, " ").trim().slice(0, 160);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -678,6 +823,12 @@ function emptyResult(
     usedFallback: false,
     insufficientContext: true,
     insufficientApprovedContext: mode === "voice",
+    evidence: {
+      score: 0,
+      level: "insufficient",
+      threshold: getActiveExperimentConfig().minimumAnswerConfidence,
+      reason: "No approved passage met the answer confidence threshold.",
+    },
   };
 }
 
@@ -695,17 +846,37 @@ export function formatScriptureContextForPrompt(
   }
 
   const lines: string[] = ["Retrieved scripture passages:"];
+  const config = getActiveExperimentConfig();
+  const tokenBudgetStrLength = config.contextTokenBudget * 4;
 
   for (const [i, chunk] of result.chunks.entries()) {
     const ref = `${chunk.sourceTitle} ${chunk.canonicalRef}`;
-    lines.push(`\n[${i + 1}] ${ref}`);
-    lines.push(`Translation: ${chunk.translation}`);
-    if (chunk.commentary) {
-      lines.push(`Commentary: ${chunk.commentary}`);
+    const chunkLines: string[] = [`\n[${i + 1}] ${ref}`];
+
+    if (chunk.originalText) {
+      chunkLines.push(`Original Sanskrit: ${chunk.originalText}`);
+    }
+    if (chunk.transliteration) {
+      chunkLines.push(`Transliteration: ${chunk.transliteration}`);
+    }
+    chunkLines.push(`Translation: ${chunk.translation}`);
+
+    if (config.includeCommentary && chunk.commentary) {
+      chunkLines.push(`Commentary: ${chunk.commentary}`);
     }
     if (chunk.practicalNote) {
-      lines.push(`Application: ${chunk.practicalNote}`);
+      chunkLines.push(`Application: ${chunk.practicalNote}`);
     }
+
+    const nextStr = chunkLines.join("\n");
+    const newLength = lines.join("\n").length + nextStr.length;
+
+    if (newLength > tokenBudgetStrLength && i > 0) {
+      // Truncate remainder by stopping loop, saving token budget
+      break;
+    }
+
+    lines.push(nextStr);
   }
 
   return lines.join("\n");

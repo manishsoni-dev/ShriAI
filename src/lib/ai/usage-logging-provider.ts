@@ -156,4 +156,10 @@ export class UsageLoggingProvider implements AIProvider {
       throw error;
     }
   }
+
+  async checkHealth(): Promise<void> {
+    if (this.provider.checkHealth) {
+      await this.provider.checkHealth();
+    }
+  }
 }

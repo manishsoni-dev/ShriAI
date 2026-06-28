@@ -1,0 +1,980 @@
+{
+  "createdAt": "2026-06-15T08:23:54.636Z",
+  "evalFile": "data/evals/scripture-retrieval/bhagavad-gita-v1.json",
+  "cases": 50,
+  "mode": "keyword-only",
+  "thresholds": {
+    "recallAt5": 0.75,
+    "expectedRefHitRate": 0.7,
+    "sourceHitRate": 0.7,
+    "zeroResultRate": 0.1,
+    "unsupportedAnswerRate": 0.1,
+    "p95LatencyMs": 1000
+  },
+  "metrics": {
+    "recallAt5": 1,
+    "expectedRefHitRate": 0.82,
+    "mrr": 0.9266666666666667,
+    "sourceHitRate": 1,
+    "zeroResultRate": 0,
+    "unsupportedAnswerRate": 0,
+    "p50LatencyMs": 5,
+    "p95LatencyMs": 10,
+    "p99LatencyMs": 39
+  },
+  "caseResults": [
+    {
+      "id": "gita-eval-001",
+      "question": "How should I deal with fear of failure?",
+      "expectedRefs": ["2.3", "2.40", "2.47"],
+      "gotRefs": ["2.7", "2.3", "2.40", "3.35", "2.31"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 2,
+      "correctSource": true,
+      "latencyMs": 39
+    },
+    {
+      "id": "gita-eval-002",
+      "question": "Should I act when I am unsure of the result?",
+      "expectedRefs": ["2.47", "2.48", "3.19"],
+      "gotRefs": ["3.9", "3.19", "3.7", "6.1", "3.35"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 2,
+      "correctSource": true,
+      "latencyMs": 12
+    },
+    {
+      "id": "gita-eval-003",
+      "question": "How do I control anger?",
+      "expectedRefs": ["2.62", "2.63", "3.37"],
+      "gotRefs": ["2.63", "2.62", "2.60", "6.5", "2.61"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 9
+    },
+    {
+      "id": "gita-eval-004",
+      "question": "What is my duty?",
+      "expectedRefs": ["2.31", "2.33", "3.35"],
+      "gotRefs": ["2.31", "3.35", "3.9", "3.19", "3.13"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-005",
+      "question": "How can I become less attached?",
+      "expectedRefs": ["2.48", "2.71", "3.19"],
+      "gotRefs": ["2.48", "5.12", "3.25", "4.20", "3.9"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-006",
+      "question": "What should I remember when grief overwhelms me?",
+      "expectedRefs": ["2.11", "2.13", "2.30"],
+      "gotRefs": ["2.30", "2.11", "2.13", "4.2", "4.1"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 10
+    },
+    {
+      "id": "gita-eval-007",
+      "question": "How do I stay steady in pleasure and pain?",
+      "expectedRefs": ["2.14", "2.15", "2.38"],
+      "gotRefs": ["2.15", "2.14", "5.19", "2.56", "2.48"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-008",
+      "question": "How should I handle desire?",
+      "expectedRefs": ["2.62", "2.70", "3.37"],
+      "gotRefs": ["2.62", "5.12", "2.48", "3.25", "3.7"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 8
+    },
+    {
+      "id": "gita-eval-009",
+      "question": "How do I know a person of steady wisdom?",
+      "expectedRefs": ["2.55", "2.56", "2.57"],
+      "gotRefs": ["2.15", "2.14", "5.19", "2.13", "2.56"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 5,
+      "correctSource": true,
+      "latencyMs": 10
+    },
+    {
+      "id": "gita-eval-010",
+      "question": "How can I work without anxiety over outcomes?",
+      "expectedRefs": ["2.47", "2.48", "3.19"],
+      "gotRefs": ["3.19", "3.9", "3.7", "2.48", "3.25"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 8
+    },
+    {
+      "id": "gita-eval-011",
+      "question": "What is the danger of chasing sense objects?",
+      "expectedRefs": ["2.62", "2.63", "2.67"],
+      "gotRefs": ["2.62", "2.67", "2.60", "2.63", "2.58"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 7
+    },
+    {
+      "id": "gita-eval-012",
+      "question": "How do I steady my mind during meditation?",
+      "expectedRefs": ["6.10", "6.11", "6.26"],
+      "gotRefs": ["6.25", "2.60", "6.37", "6.23", "6.12"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-013",
+      "question": "What is moderation in spiritual practice?",
+      "expectedRefs": ["6.16", "6.17", "6.18"],
+      "gotRefs": ["6.17", "3.7", "2.40", "3.6", "2.61"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-014",
+      "question": "How should I lift myself when I feel low?",
+      "expectedRefs": ["6.5", "6.6"],
+      "gotRefs": ["2.62", "2.60", "2.63", "6.5", "2.61"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 4,
+      "firstExactHitRank": 4,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-015",
+      "question": "Why is disciplined action better than inaction?",
+      "expectedRefs": ["3.4", "3.5", "3.8"],
+      "gotRefs": ["3.35", "3.9", "3.19", "6.1", "3.7"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-016",
+      "question": "How do wise people act for the good of others?",
+      "expectedRefs": ["3.20", "3.21", "3.25"],
+      "gotRefs": ["3.9", "3.7", "3.26", "4.18", "3.25"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 5,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-017",
+      "question": "What causes spiritual confusion?",
+      "expectedRefs": ["2.7", "2.52", "3.39"],
+      "gotRefs": ["2.63", "2.52", "3.39", "2.7", "1.41"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 2,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-018",
+      "question": "How does wisdom relate to action?",
+      "expectedRefs": ["4.18", "4.19", "4.23"],
+      "gotRefs": ["3.9", "4.18", "4.2", "4.19", "4.15"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 2,
+      "firstExactHitRank": 2,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-019",
+      "question": "What is sacred action?",
+      "expectedRefs": ["3.9", "4.24", "4.25"],
+      "gotRefs": ["3.9", "3.13", "3.10", "4.25", "4.28"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-020",
+      "question": "How is knowledge preserved and restored?",
+      "expectedRefs": ["4.1", "4.2", "4.7"],
+      "gotRefs": ["4.2", "4.1", "4.39", "4.34", "2.61"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-021",
+      "question": "When does Krishna say he manifests?",
+      "expectedRefs": ["4.7", "4.8"],
+      "gotRefs": ["7.7", "4.7", "4.8", "7.14", "7.12"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 2,
+      "firstExactHitRank": 2,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-022",
+      "question": "How do I approach a teacher or wisdom tradition?",
+      "expectedRefs": ["4.34", "4.35"],
+      "gotRefs": ["4.2", "2.11", "2.13", "2.61", "4.1"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-023",
+      "question": "Can knowledge purify a person?",
+      "expectedRefs": ["4.36", "4.37", "4.38"],
+      "gotRefs": ["4.2", "4.1", "2.61", "4.34", "4.39"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-024",
+      "question": "How should I respond to doubt?",
+      "expectedRefs": ["4.40", "4.41", "4.42"],
+      "gotRefs": ["4.2", "4.39", "4.1", "2.61", "2.13"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-025",
+      "question": "What is real renunciation?",
+      "expectedRefs": ["5.2", "5.3", "5.10"],
+      "gotRefs": ["5.12", "5.11", "5.10", "5.2", "5.3"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 3,
+      "correctSource": true,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-026",
+      "question": "How can I act and remain unstained?",
+      "expectedRefs": ["5.7", "5.10", "5.11"],
+      "gotRefs": ["5.10", "5.11", "3.9", "3.25", "4.14"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-027",
+      "question": "Where does peace come from?",
+      "expectedRefs": ["2.66", "2.71", "5.12"],
+      "gotRefs": ["2.61", "5.24", "5.13", "5.26", "5.25"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-028",
+      "question": "How should I see all beings?",
+      "expectedRefs": ["5.18", "5.19", "6.29"],
+      "gotRefs": ["6.29", "4.2", "5.18", "2.13", "2.5"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-029",
+      "question": "How can I endure external contact and discomfort?",
+      "expectedRefs": ["2.14", "5.22", "6.7"],
+      "gotRefs": ["2.14", "2.15", "5.22", "5.19", "2.56"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-030",
+      "question": "What is the inner happiness of yoga?",
+      "expectedRefs": ["5.21", "6.20", "6.21"],
+      "gotRefs": ["6.47", "6.37", "6.23", "6.25", "6.34"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-031",
+      "question": "How can I restrain restless senses?",
+      "expectedRefs": ["2.58", "2.60", "2.61"],
+      "gotRefs": ["2.62", "2.63", "2.60", "2.67", "6.5"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 3,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-032",
+      "question": "What if the mind is restless?",
+      "expectedRefs": ["6.34", "6.35", "6.26"],
+      "gotRefs": ["6.35", "6.37", "6.20", "6.23", "6.25"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-033",
+      "question": "Does effort on the path ever go to waste?",
+      "expectedRefs": ["2.40", "6.40", "6.41"],
+      "gotRefs": ["2.40", "6.40", "6.41", "3.7", "2.61"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-034",
+      "question": "Who is the highest yogi?",
+      "expectedRefs": ["6.46", "6.47"],
+      "gotRefs": ["6.47", "6.46", "7.4", "4.7", "6.37"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-035",
+      "question": "How do I understand divine nature?",
+      "expectedRefs": ["7.4", "7.5", "7.7"],
+      "gotRefs": ["7.5", "4.2", "7.4", "4.1", "4.7"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-036",
+      "question": "How can I see Krishna in the world?",
+      "expectedRefs": ["7.8", "7.9", "7.10"],
+      "gotRefs": ["7.7", "7.12", "7.14", "7.15", "4.7"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-037",
+      "question": "What are the gunas?",
+      "expectedRefs": ["7.12", "7.13", "3.27"],
+      "gotRefs": ["4.1", "4.2", "7.13", "7.5", "7.4"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 3,
+      "firstExactHitRank": 3,
+      "correctSource": true,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-038",
+      "question": "How do I move beyond delusion?",
+      "expectedRefs": ["2.52", "7.14", "7.15"],
+      "gotRefs": ["4.2", "2.52", "7.15", "4.1", "2.61"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 2,
+      "firstExactHitRank": 2,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-039",
+      "question": "Who turns toward Krishna?",
+      "expectedRefs": ["7.16", "7.17", "7.18"],
+      "gotRefs": ["7.15", "7.7", "7.12", "7.17", "7.10"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 4,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-040",
+      "question": "What is the problem with desire-led worship?",
+      "expectedRefs": ["7.20", "2.62", "3.39"],
+      "gotRefs": ["2.62", "5.12", "2.48", "3.25", "3.7"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-041",
+      "question": "Why should I not collapse into weakness?",
+      "expectedRefs": ["2.2", "2.3"],
+      "gotRefs": ["2.3", "2.40", "2.7", "2.56", "4.10"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-042",
+      "question": "How should I decide when family duty conflicts with moral duty?",
+      "expectedRefs": ["1.28", "2.7", "2.31"],
+      "gotRefs": ["1.28", "2.7", "2.31", "1.40", "3.9"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-043",
+      "question": "What does Krishna say about death and the soul?",
+      "expectedRefs": ["2.20", "2.22", "2.23"],
+      "gotRefs": ["2.13", "2.19", "4.2", "2.30", "2.20"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 5,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-044",
+      "question": "How do I stay balanced in success and failure?",
+      "expectedRefs": ["2.38", "2.48", "6.7"],
+      "gotRefs": ["2.15", "2.14", "5.19", "2.48", "2.43"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 4,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-045",
+      "question": "What does yoga mean in action?",
+      "expectedRefs": ["2.48", "2.50", "3.7"],
+      "gotRefs": ["3.9", "3.19", "3.7", "3.35", "6.1"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 3,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-046",
+      "question": "How can I avoid hypocrisy in spiritual practice?",
+      "expectedRefs": ["3.6", "3.7"],
+      "gotRefs": ["3.7", "3.6", "2.40", "2.61", "6.17"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-047",
+      "question": "Why should leaders act carefully?",
+      "expectedRefs": ["3.21", "3.24", "3.26"],
+      "gotRefs": ["3.9", "3.7", "3.26", "5.10", "5.11"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 3,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-048",
+      "question": "What should I do with attachment to my own role?",
+      "expectedRefs": ["3.35", "2.31"],
+      "gotRefs": ["3.9", "3.19", "3.7", "2.48", "3.25"],
+      "recallHit": true,
+      "expectedRefHit": false,
+      "firstHitRank": 1,
+      "firstExactHitRank": null,
+      "correctSource": true,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-049",
+      "question": "How does sacrifice relate to daily life?",
+      "expectedRefs": ["3.9", "3.10", "3.13"],
+      "gotRefs": ["3.9", "3.10", "3.13", "4.30", "4.31"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 1,
+      "firstExactHitRank": 1,
+      "correctSource": true,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-050",
+      "question": "How can I become a friend to myself?",
+      "expectedRefs": ["6.5", "6.6"],
+      "gotRefs": ["2.62", "2.63", "2.60", "6.5", "6.6"],
+      "recallHit": true,
+      "expectedRefHit": true,
+      "firstHitRank": 4,
+      "firstExactHitRank": 4,
+      "correctSource": true,
+      "latencyMs": 5
+    }
+  ],
+  "passes": [
+    {
+      "id": "gita-eval-001",
+      "question": "How should I deal with fear of failure?",
+      "firstHitRef": "2.7",
+      "rank": 1,
+      "latencyMs": 39
+    },
+    {
+      "id": "gita-eval-002",
+      "question": "Should I act when I am unsure of the result?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 12
+    },
+    {
+      "id": "gita-eval-003",
+      "question": "How do I control anger?",
+      "firstHitRef": "2.63",
+      "rank": 1,
+      "latencyMs": 9
+    },
+    {
+      "id": "gita-eval-004",
+      "question": "What is my duty?",
+      "firstHitRef": "2.31",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-005",
+      "question": "How can I become less attached?",
+      "firstHitRef": "2.48",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-006",
+      "question": "What should I remember when grief overwhelms me?",
+      "firstHitRef": "2.30",
+      "rank": 1,
+      "latencyMs": 10
+    },
+    {
+      "id": "gita-eval-007",
+      "question": "How do I stay steady in pleasure and pain?",
+      "firstHitRef": "2.15",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-008",
+      "question": "How should I handle desire?",
+      "firstHitRef": "2.62",
+      "rank": 1,
+      "latencyMs": 8
+    },
+    {
+      "id": "gita-eval-009",
+      "question": "How do I know a person of steady wisdom?",
+      "firstHitRef": "2.15",
+      "rank": 1,
+      "latencyMs": 10
+    },
+    {
+      "id": "gita-eval-010",
+      "question": "How can I work without anxiety over outcomes?",
+      "firstHitRef": "3.19",
+      "rank": 1,
+      "latencyMs": 8
+    },
+    {
+      "id": "gita-eval-011",
+      "question": "What is the danger of chasing sense objects?",
+      "firstHitRef": "2.62",
+      "rank": 1,
+      "latencyMs": 7
+    },
+    {
+      "id": "gita-eval-012",
+      "question": "How do I steady my mind during meditation?",
+      "firstHitRef": "6.25",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-013",
+      "question": "What is moderation in spiritual practice?",
+      "firstHitRef": "6.17",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-014",
+      "question": "How should I lift myself when I feel low?",
+      "firstHitRef": "6.5",
+      "rank": 4,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-015",
+      "question": "Why is disciplined action better than inaction?",
+      "firstHitRef": "3.35",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-016",
+      "question": "How do wise people act for the good of others?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-017",
+      "question": "What causes spiritual confusion?",
+      "firstHitRef": "2.63",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-018",
+      "question": "How does wisdom relate to action?",
+      "firstHitRef": "4.18",
+      "rank": 2,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-019",
+      "question": "What is sacred action?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-020",
+      "question": "How is knowledge preserved and restored?",
+      "firstHitRef": "4.2",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-021",
+      "question": "When does Krishna say he manifests?",
+      "firstHitRef": "4.7",
+      "rank": 2,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-022",
+      "question": "How do I approach a teacher or wisdom tradition?",
+      "firstHitRef": "4.2",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-023",
+      "question": "Can knowledge purify a person?",
+      "firstHitRef": "4.2",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-024",
+      "question": "How should I respond to doubt?",
+      "firstHitRef": "4.2",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-025",
+      "question": "What is real renunciation?",
+      "firstHitRef": "5.12",
+      "rank": 1,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-026",
+      "question": "How can I act and remain unstained?",
+      "firstHitRef": "5.10",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-027",
+      "question": "Where does peace come from?",
+      "firstHitRef": "2.61",
+      "rank": 1,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-028",
+      "question": "How should I see all beings?",
+      "firstHitRef": "6.29",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-029",
+      "question": "How can I endure external contact and discomfort?",
+      "firstHitRef": "2.14",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-030",
+      "question": "What is the inner happiness of yoga?",
+      "firstHitRef": "6.47",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-031",
+      "question": "How can I restrain restless senses?",
+      "firstHitRef": "2.62",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-032",
+      "question": "What if the mind is restless?",
+      "firstHitRef": "6.35",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-033",
+      "question": "Does effort on the path ever go to waste?",
+      "firstHitRef": "2.40",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-034",
+      "question": "Who is the highest yogi?",
+      "firstHitRef": "6.47",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-035",
+      "question": "How do I understand divine nature?",
+      "firstHitRef": "7.5",
+      "rank": 1,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-036",
+      "question": "How can I see Krishna in the world?",
+      "firstHitRef": "7.7",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-037",
+      "question": "What are the gunas?",
+      "firstHitRef": "7.13",
+      "rank": 3,
+      "latencyMs": 3
+    },
+    {
+      "id": "gita-eval-038",
+      "question": "How do I move beyond delusion?",
+      "firstHitRef": "2.52",
+      "rank": 2,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-039",
+      "question": "Who turns toward Krishna?",
+      "firstHitRef": "7.15",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-040",
+      "question": "What is the problem with desire-led worship?",
+      "firstHitRef": "2.62",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-041",
+      "question": "Why should I not collapse into weakness?",
+      "firstHitRef": "2.3",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-042",
+      "question": "How should I decide when family duty conflicts with moral duty?",
+      "firstHitRef": "1.28",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-043",
+      "question": "What does Krishna say about death and the soul?",
+      "firstHitRef": "2.13",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-044",
+      "question": "How do I stay balanced in success and failure?",
+      "firstHitRef": "2.15",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-045",
+      "question": "What does yoga mean in action?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-046",
+      "question": "How can I avoid hypocrisy in spiritual practice?",
+      "firstHitRef": "3.7",
+      "rank": 1,
+      "latencyMs": 5
+    },
+    {
+      "id": "gita-eval-047",
+      "question": "Why should leaders act carefully?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-048",
+      "question": "What should I do with attachment to my own role?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 6
+    },
+    {
+      "id": "gita-eval-049",
+      "question": "How does sacrifice relate to daily life?",
+      "firstHitRef": "3.9",
+      "rank": 1,
+      "latencyMs": 4
+    },
+    {
+      "id": "gita-eval-050",
+      "question": "How can I become a friend to myself?",
+      "firstHitRef": "6.5",
+      "rank": 4,
+      "latencyMs": 5
+    }
+  ],
+  "misses": []
+}
