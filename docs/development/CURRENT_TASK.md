@@ -114,7 +114,7 @@ git status --short
 
 ### Decisions Made
 
-- Decided to use `vi.mocked` strictly in vitest over `any` casting to satisfy strictly-enforced TS/ESLint configurations without reducing code quality. 
+- Decided to use `vi.mocked` strictly in vitest over `any` casting to satisfy strictly-enforced TS/ESLint configurations without reducing code quality.
 
 ### Tests Run
 
