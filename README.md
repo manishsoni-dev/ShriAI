@@ -500,6 +500,19 @@ SHRI_AI_EMBEDDING_DIMENSIONS="1024"
 All model and speech base URLs are server-only and restricted to loopback
 hosts. No hosted AI provider or API key is used.
 
+## Managed Services Boundary
+
+P0.2 defines optional configuration boundaries for future Supabase, Pinecone,
+PostHog, Sentry, Resend, and Inngest work. These services are not active
+product paths yet. Missing optional provider configuration is reported as an
+explicit `*_NOT_CONFIGURED` state rather than a crash.
+
+Server-only values such as `SUPABASE_SECRET_KEY`, `PINECONE_API_KEY`,
+`RESEND_API_KEY`, `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`,
+`SENTRY_AUTH_TOKEN`, and `DATABASE_URL` must never be imported into browser
+code. Pinecone, when enabled in a future phase, is a derived index only; the
+authoritative document state remains in Postgres. See
+[`docs/architecture/MANAGED_SERVICES_BOUNDARY.md`](docs/architecture/MANAGED_SERVICES_BOUNDARY.md).
 
 ## Knowledge Base
 
