@@ -68,6 +68,7 @@ export async function semanticSearch(input: SemanticSearchInput) {
     FROM "DocumentChunk"
     INNER JOIN "Document" ON "Document"."id" = "DocumentChunk"."documentId"
     WHERE "DocumentChunk"."workspaceId" = ${input.workspaceId}
+      AND "Document"."status" = 'ready'
       AND "DocumentChunk"."embedding" IS NOT NULL
     ORDER BY "DocumentChunk"."embedding" <=> ${vector}::vector
     LIMIT ${topK}
