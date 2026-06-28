@@ -73,12 +73,18 @@ export async function uploadDocumentAction(formData: FormData) {
     contentType: file.type || "application/octet-stream",
     bytes: new Uint8Array(await file.arrayBuffer()),
   });
-  await ingestDocument({
+
+  const ingestedDocument = await ingestDocument({
     userId: user.id,
     documentId: document.id,
   });
 
   revalidatePath("/knowledge");
+
+  if (!ingestedDocument || ingestedDocument.status !== "ready") {
+    redirect("/knowledge?error=ingestion-failed");
+  }
+
   redirect("/knowledge?uploaded=1");
 }
 
