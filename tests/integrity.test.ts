@@ -2,6 +2,18 @@ import "dotenv/config";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { db } from "../src/lib/db";
 
+vi.mock("../src/lib/db", () => ({
+  db: {
+    scriptureChunkReview: {
+      count: vi.fn().mockResolvedValue(0),
+    },
+    voiceQaRun: {
+      count: vi.fn().mockResolvedValue(1),
+    },
+    $queryRaw: vi.fn().mockResolvedValue([{ embeddingModel: "test-model" }]),
+  },
+}));
+
 // The checks are mostly run within check-release-readiness.ts
 // We will test the underlying validation functions and queries here.
 
