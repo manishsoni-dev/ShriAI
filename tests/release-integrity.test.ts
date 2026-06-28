@@ -46,7 +46,9 @@ describe("release integrity configuration", () => {
   it("pins Caddy CI validation configuration", () => {
     const ci = readFileSync(".github/workflows/ci.yml", "utf8");
     expect(ci).toContain("caddy:2-alpine");
-    expect(ci).toContain("caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile");
+    expect(ci).toContain(
+      "caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile",
+    );
     expect(ci).not.toContain("caddy:latest");
   });
 

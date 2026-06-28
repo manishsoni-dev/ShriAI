@@ -26,6 +26,9 @@ import { execSync } from "node:child_process";
 const argv = process.argv.slice(2);
 const noGate = argv.includes("--no-gate");
 const verbose = argv.includes("--verbose");
+const caseTimeoutMs = Number(
+  process.env.SCRIPTURE_EVAL_CASE_TIMEOUT_MS ?? "90000",
+);
 const fileArg = argv.find((a) => a.startsWith("--file="));
 const evalFile = path.resolve(
   process.cwd(),
@@ -62,6 +65,120 @@ type EvalCase = {
   adversarial?: boolean;
   expectedBehavior?: "grounded" | "abstain" | "resist_injection" | "crisis";
 };
+
+type LocalAIFailureCode =
+  | "LOCAL_AI_NOT_CONFIGURED"
+  | "LOCAL_AI_UNAVAILABLE"
+  | "LOCAL_MODEL_MISSING";
+
+class LocalAIFailure extends Error {
+  constructor(
+    readonly code: LocalAIFailureCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = "LocalAIFailure";
+  }
+}
+
+function failLocalAI(error: LocalAIFailure): never {
+  console.error(`${error.code}: ${error.message}`);
+  process.exit(1);
+}
+
+function readRequiredEnv(name: string) {
+  const value = process.env[name]?.trim();
+  return value && !value.includes("replace-with") ? value : null;
+}
+
+async function fetchWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function assertLocalAIReady() {
+  const baseUrl = readRequiredEnv("OLLAMA_BASE_URL");
+  const chatModel = readRequiredEnv("SHRI_AI_CHAT_MODEL");
+  const embeddingModel = readRequiredEnv("SHRI_AI_EMBEDDING_MODEL");
+
+  if (!baseUrl || !chatModel || !embeddingModel) {
+    throw new LocalAIFailure(
+      "LOCAL_AI_NOT_CONFIGURED",
+      "Set OLLAMA_BASE_URL, SHRI_AI_CHAT_MODEL, and SHRI_AI_EMBEDDING_MODEL before running scripture eval.",
+    );
+  }
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      `${baseUrl.replace(/\/$/, "")}/api/tags`,
+      2500,
+    );
+  } catch {
+    throw new LocalAIFailure(
+      "LOCAL_AI_UNAVAILABLE",
+      "Ollama did not respond to /api/tags.",
+    );
+  }
+
+  if (!response.ok) {
+    throw new LocalAIFailure(
+      "LOCAL_AI_UNAVAILABLE",
+      "Ollama returned a non-OK readiness status.",
+    );
+  }
+
+  const payload = (await response.json().catch(() => null)) as {
+    models?: Array<{ name?: unknown; model?: unknown }>;
+  } | null;
+  const modelNames = new Set(
+    (payload?.models ?? [])
+      .flatMap((model) => [model.name, model.model])
+      .filter((value): value is string => typeof value === "string"),
+  );
+  const missing = [chatModel, embeddingModel].filter(
+    (model) => !modelNames.has(model),
+  );
+  if (missing.length > 0) {
+    throw new LocalAIFailure(
+      "LOCAL_MODEL_MISSING",
+      `Missing Ollama model(s): ${missing.join(", ")}`,
+    );
+  }
+}
+
+async function withCaseTimeout<T>(caseId: string, work: Promise<T>) {
+  let timeout: NodeJS.Timeout | undefined;
+  const timer = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () =>
+        reject(
+          new LocalAIFailure(
+            "LOCAL_AI_UNAVAILABLE",
+            `Evaluation case ${caseId} exceeded ${caseTimeoutMs}ms.`,
+          ),
+        ),
+      caseTimeoutMs,
+    );
+  });
+
+  try {
+    return await Promise.race([work, timer]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+function writeJsonAtomically(filePath: string, value: unknown) {
+  const tempPath = `${filePath}.tmp-${process.pid}`;
+  fs.writeFileSync(tempPath, JSON.stringify(value, null, 2));
+  fs.renameSync(tempPath, filePath);
+}
 
 function chapterOf(ref: string): number {
   return Number(ref.split(".")[0]);
@@ -126,6 +243,13 @@ async function main() {
   console.log(hr());
   console.log();
 
+  try {
+    await assertLocalAIReady();
+  } catch (error) {
+    if (error instanceof LocalAIFailure) failLocalAI(error);
+    throw error;
+  }
+
   let recallHits1 = 0;
   let recallHits3 = 0;
   let recallHits5 = 0;
@@ -166,187 +290,237 @@ async function main() {
 
   for (let i = 0; i < cases.length; i++) {
     const evalCase = cases[i];
-    const expectedRefs = evalCase.expectedRefs ?? [];
-    const expectedBehavior = evalCase.expectedBehavior ?? "grounded";
-
-    if (expectedBehavior === "crisis") {
-      const { detectCrisisIntent } = await import("../src/lib/safety/crisis");
-      crisisCases++;
-      const routed = detectCrisisIntent(evalCase.question);
-      if (routed) correctlyRoutedCrises++;
-      caseResults.push({
-        id: evalCase.id,
-        question: evalCase.question,
-        expectedBehavior,
-        crisisRouted: routed,
-      });
-      continue;
-    }
-
-    if (i > 0 && i % 5 === 0) {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-
-    const t0 = Date.now();
-
-    // 1. Retrieval
-    const result = await retrieveScriptureContext({
-      query: evalCase.question,
-      personaId: evalCase.personaId,
-      themes: evalCase.themes ?? [],
-      limit: config.finalTopK,
-      debugMode: true,
-      mode: "text",
-    });
-
-    const retrievalMs = Date.now() - t0;
-    latenciesRetrieval.push(retrievalMs);
-    if (result.debug) {
-      latenciesEmbed.push(result.debug.queryEmbeddingMs);
-      latenciesVector.push(result.debug.vectorSearchMs);
-      latenciesKeyword.push(result.debug.keywordSearchMs);
-    }
-
-    const gotRefs = result.chunks.map((r) => r.canonicalRef);
-    const expectedSet = new Set(expectedRefs);
-    const acceptableChapters = new Set(evalCase.acceptableChapters ?? []);
-
-    const firstExactHitIndex = gotRefs.findIndex((ref) => expectedSet.has(ref));
-    const firstChapterHitIndex = gotRefs.findIndex(
-      (ref) => expectedSet.has(ref) || acceptableChapters.has(chapterOf(ref)),
+    console.log(
+      `[${i + 1}/${cases.length}] ${evalCase.id}: ${evalCase.expectedBehavior ?? "grounded"}`,
     );
+    await withCaseTimeout(
+      evalCase.id,
+      (async () => {
+        const expectedRefs = evalCase.expectedRefs ?? [];
+        const expectedBehavior = evalCase.expectedBehavior ?? "grounded";
 
-    const hasHit = firstChapterHitIndex >= 0;
-    const hasExactHit = firstExactHitIndex >= 0;
-    const targetSource = evalCase.expectedSource ?? "Bhagavad Gita";
-    const correctSource =
-      result.chunks.length > 0 &&
-      result.chunks.some((r) => r.sourceTitle === targetSource);
-
-    if (expectedBehavior === "grounded") {
-      if (hasHit) {
-        if (firstChapterHitIndex < 1) chapterHits1++;
-        if (firstChapterHitIndex < 3) chapterHits3++;
-        if (firstChapterHitIndex < 5) chapterHits5++;
-      }
-
-      if (hasExactHit) {
-        if (firstExactHitIndex < 1) recallHits1++;
-        if (firstExactHitIndex < 3) recallHits3++;
-        if (firstExactHitIndex < 5) recallHits5++;
-      }
-
-      expectedRefHits += hasExactHit ? 1 : 0;
-      rrTotal += hasHit ? 1 / (firstChapterHitIndex + 1) : 0;
-      if (correctSource) sourceHits++;
-      if (result.chunks.length === 0) zeroResults++;
-      if (result.chunks.length === 0 || !correctSource) unsupportedAnswers++;
-    }
-
-    // 2. Generation
-    const persona = getPersona(evalCase.personaId);
-    const scriptureContext = formatScriptureContextForPrompt(result);
-
-    const stream = streamGroundedAnswer({
-      query: evalCase.question,
-      persona: persona,
-      scriptureContext: scriptureContext,
-      insufficientContext: result.insufficientContext,
-      insufficientApprovedContext: result.insufficientApprovedContext,
-      evidence: result.evidence,
-      retrievedChunks: result.chunks,
-    });
-
-    let firstTokenMs: number | null = null;
-    let finalAnswer: GroundedAnswer | null = null;
-
-    for await (const event of stream) {
-      if (event.type === "delta" && firstTokenMs === null) {
-        firstTokenMs = Date.now() - t0;
-      } else if (event.type === "done") {
-        finalAnswer = event.answer;
-        if (finalAnswer.metadata?.usage) {
-          totalInputTokens += finalAnswer.metadata.usage.inputTokens ?? 0;
-          totalOutputTokens += finalAnswer.metadata.usage.outputTokens ?? 0;
+        if (expectedBehavior === "crisis") {
+          const { detectCrisisIntent } =
+            await import("../src/lib/safety/crisis");
+          crisisCases++;
+          const routed = detectCrisisIntent(evalCase.question);
+          if (routed) correctlyRoutedCrises++;
+          caseResults.push({
+            id: evalCase.id,
+            question: evalCase.question,
+            expectedBehavior,
+            crisisRouted: routed,
+          });
+          return;
         }
-      }
-    }
 
-    const totalTurnMs = Date.now() - t0;
-    if (firstTokenMs) latenciesFirstToken.push(firstTokenMs);
-    latenciesTotalTurn.push(totalTurnMs);
+        if (i > 0 && i % 5 === 0) {
+          await new Promise((r) => setTimeout(r, 1000));
+        }
 
-    const retrievedIds = new Set(result.chunks.map((chunk) => chunk.id));
-    const hasFabricatedCitation = Boolean(
-      finalAnswer?.citations.some(
-        (citation) => !retrievedIds.has(citation.chunkId),
-      ),
-    );
-    if (hasFabricatedCitation) fabricatedCitations++;
-    if (expectedBehavior === "abstain") {
-      abstentionCases++;
-      if (finalAnswer?.abstained && finalAnswer.citations.length === 0) {
-        correctAbstentions++;
-      }
-    }
-    if (expectedBehavior === "resist_injection") {
-      injectionCases++;
-      if (
-        !hasFabricatedCitation &&
-        !finalAnswer?.answer.includes("system prompt")
-      ) {
-        resistedInjections++;
-      }
-    }
+        const t0 = Date.now();
 
-    // 3. LLM Judge Evaluation
-    const judgeResult = await scoreWithLLMJudge({
-      question: evalCase.question,
-      expectedRefs: expectedRefs,
-      retrievedContext: scriptureContext,
-      generatedAnswer: finalAnswer?.displayAnswer || "",
-      generatedCitations: finalAnswer?.citations || [],
-      personaId: persona.id,
+        // 1. Retrieval
+        const result = await retrieveScriptureContext({
+          query: evalCase.question,
+          personaId: evalCase.personaId,
+          themes: evalCase.themes ?? [],
+          limit: config.finalTopK,
+          debugMode: true,
+          mode: "text",
+        });
+
+        const retrievalMs = Date.now() - t0;
+        latenciesRetrieval.push(retrievalMs);
+        if (result.debug) {
+          latenciesEmbed.push(result.debug.queryEmbeddingMs);
+          latenciesVector.push(result.debug.vectorSearchMs);
+          latenciesKeyword.push(result.debug.keywordSearchMs);
+        }
+
+        const gotRefs = result.chunks.map((r) => r.canonicalRef);
+        const expectedSet = new Set(expectedRefs);
+        const acceptableChapters = new Set(evalCase.acceptableChapters ?? []);
+
+        const firstExactHitIndex = gotRefs.findIndex((ref) =>
+          expectedSet.has(ref),
+        );
+        const firstChapterHitIndex = gotRefs.findIndex(
+          (ref) =>
+            expectedSet.has(ref) || acceptableChapters.has(chapterOf(ref)),
+        );
+
+        const hasHit = firstChapterHitIndex >= 0;
+        const hasExactHit = firstExactHitIndex >= 0;
+        const targetSource = evalCase.expectedSource ?? "Bhagavad Gita";
+        const correctSource =
+          result.chunks.length > 0 &&
+          result.chunks.some((r) => r.sourceTitle === targetSource);
+
+        if (expectedBehavior === "grounded") {
+          if (hasHit) {
+            if (firstChapterHitIndex < 1) chapterHits1++;
+            if (firstChapterHitIndex < 3) chapterHits3++;
+            if (firstChapterHitIndex < 5) chapterHits5++;
+          }
+
+          if (hasExactHit) {
+            if (firstExactHitIndex < 1) recallHits1++;
+            if (firstExactHitIndex < 3) recallHits3++;
+            if (firstExactHitIndex < 5) recallHits5++;
+          }
+
+          expectedRefHits += hasExactHit ? 1 : 0;
+          rrTotal += hasHit ? 1 / (firstChapterHitIndex + 1) : 0;
+          if (correctSource) sourceHits++;
+          if (result.chunks.length === 0) zeroResults++;
+          if (result.chunks.length === 0 || !correctSource)
+            unsupportedAnswers++;
+        }
+
+        // 2. Generation
+        const persona = getPersona(evalCase.personaId);
+        const scriptureContext = formatScriptureContextForPrompt(result);
+
+        const stream = streamGroundedAnswer({
+          query: evalCase.question,
+          persona: persona,
+          scriptureContext: scriptureContext,
+          insufficientContext: result.insufficientContext,
+          insufficientApprovedContext: result.insufficientApprovedContext,
+          evidence: result.evidence,
+          retrievedChunks: result.chunks,
+        });
+
+        let firstTokenMs: number | null = null;
+        let finalAnswer: GroundedAnswer | null = null;
+        let turnError: Error | null = null;
+
+        try {
+          for await (const event of stream) {
+            if (event.type === "delta" && firstTokenMs === null) {
+              firstTokenMs = Date.now() - t0;
+            } else if (event.type === "done") {
+              finalAnswer = event.answer;
+              if (finalAnswer.metadata?.usage) {
+                totalInputTokens += finalAnswer.metadata.usage.inputTokens ?? 0;
+                totalOutputTokens +=
+                  finalAnswer.metadata.usage.outputTokens ?? 0;
+              }
+            }
+          }
+        } catch (error) {
+          console.error(
+            `[${evalCase.id}] Stream failed:`,
+            error instanceof Error ? error.message : String(error),
+          );
+          turnError = error instanceof Error ? error : new Error(String(error));
+        }
+
+        if (turnError) {
+          throw new LocalAIFailure(
+            "LOCAL_AI_UNAVAILABLE",
+            `Evaluation case ${evalCase.id} failed during local generation.`,
+          );
+        }
+
+        const totalTurnMs = Date.now() - t0;
+        if (firstTokenMs) latenciesFirstToken.push(firstTokenMs);
+        latenciesTotalTurn.push(totalTurnMs);
+
+        const retrievedIds = new Set(result.chunks.map((chunk) => chunk.id));
+        const hasFabricatedCitation = Boolean(
+          finalAnswer?.citations.some(
+            (citation) => !retrievedIds.has(citation.chunkId),
+          ),
+        );
+        if (hasFabricatedCitation) fabricatedCitations++;
+        if (expectedBehavior === "abstain") {
+          abstentionCases++;
+          if (finalAnswer?.abstained && finalAnswer.citations.length === 0) {
+            correctAbstentions++;
+          }
+        }
+        if (expectedBehavior === "resist_injection") {
+          injectionCases++;
+          if (
+            !hasFabricatedCitation &&
+            !finalAnswer?.answer.includes("system prompt")
+          ) {
+            resistedInjections++;
+          }
+        }
+
+        let judgeResult = {
+          groundednessScore: 0,
+          citationPrecision: 0,
+          fallbackAccuracy: 0,
+          personaReasoningScore: 1,
+          personaEmotionScore: 1,
+          personaMotivationScore: 1,
+          personaClarityScore: 1,
+        };
+        let calculatedPersonaFit = 0;
+
+        try {
+          judgeResult = await scoreWithLLMJudge({
+            question: evalCase.question,
+            expectedRefs: expectedRefs,
+            retrievedContext: scriptureContext,
+            generatedAnswer: finalAnswer?.displayAnswer || "",
+            generatedCitations: finalAnswer?.citations || [],
+            personaId: persona.id,
+          });
+
+          calculatedPersonaFit =
+            ((judgeResult.personaReasoningScore - 1) / 4 +
+              (judgeResult.personaEmotionScore - 1) / 4 +
+              (judgeResult.personaMotivationScore - 1) / 4 +
+              (judgeResult.personaClarityScore - 1) / 4) /
+            4;
+        } catch (error) {
+          console.error(
+            `[${evalCase.id}] LLM Judge evaluation failed:`,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+
+        sumGroundedness += judgeResult.groundednessScore;
+        sumCitationPrecision += judgeResult.citationPrecision;
+        sumPersonaFit += calculatedPersonaFit;
+        sumFallbackAccuracy += judgeResult.fallbackAccuracy;
+
+        caseResults.push({
+          id: evalCase.id,
+          question: evalCase.question,
+          expectedRefs,
+          expectedBehavior,
+          gotRefs,
+          recallHit: hasHit,
+          expectedRefHit: hasExactHit,
+          firstHitRank: hasHit ? firstChapterHitIndex + 1 : null,
+          firstExactHitRank: hasExactHit ? firstExactHitIndex + 1 : null,
+          correctSource,
+          retrievalMs,
+          firstTokenMs,
+          totalTurnMs,
+          judgeResult,
+          generatedAnswer: finalAnswer?.displayAnswer,
+          generatedCitations: finalAnswer?.citations,
+        });
+
+        if (verbose) {
+          console.log(
+            `[${evalCase.id}] ${hasHit || evalCase.fallbackExpected ? "✅" : "❌"} ` +
+              `${totalTurnMs}ms - Groundedness: ${judgeResult.groundednessScore.toFixed(2)}, ` +
+              `Citation Prec: ${judgeResult.citationPrecision.toFixed(2)}`,
+          );
+        }
+      })(),
+    ).catch((error) => {
+      if (error instanceof LocalAIFailure) failLocalAI(error);
+      throw error;
     });
-
-    const calculatedPersonaFit =
-      ((judgeResult.personaReasoningScore - 1) / 4 +
-        (judgeResult.personaEmotionScore - 1) / 4 +
-        (judgeResult.personaMotivationScore - 1) / 4 +
-        (judgeResult.personaClarityScore - 1) / 4) /
-      4;
-
-    sumGroundedness += judgeResult.groundednessScore;
-    sumCitationPrecision += judgeResult.citationPrecision;
-    sumPersonaFit += calculatedPersonaFit;
-    sumFallbackAccuracy += judgeResult.fallbackAccuracy;
-
-    caseResults.push({
-      id: evalCase.id,
-      question: evalCase.question,
-      expectedRefs,
-      expectedBehavior,
-      gotRefs,
-      recallHit: hasHit,
-      expectedRefHit: hasExactHit,
-      firstHitRank: hasHit ? firstChapterHitIndex + 1 : null,
-      firstExactHitRank: hasExactHit ? firstExactHitIndex + 1 : null,
-      correctSource,
-      retrievalMs,
-      firstTokenMs,
-      totalTurnMs,
-      judgeResult,
-      generatedAnswer: finalAnswer?.displayAnswer,
-      generatedCitations: finalAnswer?.citations,
-    });
-
-    if (verbose) {
-      console.log(
-        `[${evalCase.id}] ${hasHit || evalCase.fallbackExpected ? "✅" : "❌"} ` +
-          `${totalTurnMs}ms - Groundedness: ${judgeResult.groundednessScore.toFixed(2)}, ` +
-          `Citation Prec: ${judgeResult.citationPrecision.toFixed(2)}`,
-      );
-    }
   }
 
   const n = cases.length;
@@ -525,51 +699,42 @@ async function main() {
     `eval-run-${config.id}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
   );
 
-  fs.writeFileSync(
-    artifactPath,
-    JSON.stringify(
-      {
-        createdAt: new Date().toISOString(),
-        gitSha: getGitSha(),
-        datasetHash,
-        experimentConfig: config,
-        evalFile: path.relative(process.cwd(), evalFile),
-        cases: n,
-        mode: "production-pipeline",
-        passed: gatePassed,
-        thresholds: THRESHOLDS,
-        metrics: {
-          recallAt5,
-          expectedRefHitRate,
-          mrr,
-          sourceHitRate,
-          zeroResultRate,
-          unsupportedAnswerRate,
-          avgGroundedness,
-          avgCitationPrec,
-          avgPersonaFit,
-          avgFallbackAcc,
-          fabricatedCitationRate,
-          abstentionAccuracy,
-          injectionResistance,
-          crisisRoutingAccuracy,
-          latency: {
-            p50RetrievalMs: p50Ret,
-            p95RetrievalMs: p95Ret,
-            p50FirstTokenMs: p50FirstToken,
-            p95FirstTokenMs: p95FirstToken,
-            p50TotalTurnMs: p50Turn,
-            p95TotalTurnMs: p95Turn,
-          },
-        },
-        caseResults,
+  const artifact = {
+    createdAt: new Date().toISOString(),
+    gitSha: getGitSha(),
+    datasetHash,
+    experimentConfig: config,
+    evalFile: path.relative(process.cwd(), evalFile),
+    cases: n,
+    mode: "production-pipeline",
+    passed: gatePassed,
+    thresholds: THRESHOLDS,
+    metrics: {
+      recallAt5,
+      expectedRefHitRate,
+      mrr,
+      sourceHitRate,
+      zeroResultRate,
+      unsupportedAnswerRate,
+      avgGroundedness,
+      avgCitationPrec,
+      avgPersonaFit,
+      avgFallbackAcc,
+      fabricatedCitationRate,
+      abstentionAccuracy,
+      injectionResistance,
+      crisisRoutingAccuracy,
+      latency: {
+        p50RetrievalMs: p50Ret,
+        p95RetrievalMs: p95Ret,
+        p50FirstTokenMs: p50FirstToken,
+        p95FirstTokenMs: p95FirstToken,
+        p50TotalTurnMs: p50Turn,
+        p95TotalTurnMs: p95Turn,
       },
-      null,
-      2,
-    ),
-  );
-  console.log(`  Eval artifact: ${path.relative(process.cwd(), artifactPath)}`);
-  console.log();
+    },
+    caseResults,
+  };
 
   const gateFailures = [
     recallAt5 < THRESHOLDS.recallAt5 ? "Recall@5 too low" : null,
@@ -614,9 +779,15 @@ async function main() {
     console.log("  Gate check skipped (--no-gate).");
   } else if (gateFailures.length === 0) {
     console.log("  ✅  ALL RELEASE GATES PASSED");
+    writeJsonAtomically(artifactPath, artifact);
+    console.log(
+      `  Eval artifact: ${path.relative(process.cwd(), artifactPath)}`,
+    );
+    console.log();
   } else {
     console.log("  ❌  RELEASE GATE FAILED:");
     for (const f of gateFailures) console.log(`     • ${f}`);
+    console.log("  Eval artifact not written because release gates failed.");
     // Non-zero exit code indicates failure
     process.exit(1);
   }

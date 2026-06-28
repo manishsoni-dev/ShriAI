@@ -1,0 +1,45 @@
+{
+	# Caddy global configuration
+	admin off
+	auto_https disable_redirects
+}
+
+:80, :443 {
+	# TLS configuration
+	# Uses an internal, auto-generated CA for local development
+	# For production, replace 'internal' with your email to use Let's Encrypt
+	tls internal
+
+	# Security Headers
+	header {
+		# Disable Server header
+		-Server
+
+		# Enable HTTP Strict Transport Security (HSTS)
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+		# Prevent MIME type sniffing
+		X-Content-Type-Options "nosniff"
+
+		# Prevent clickjacking
+		X-Frame-Options "DENY"
+
+		# Modern frame-ancestors protection
+		Content-Security-Policy "frame-ancestors 'none';"
+
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+
+		# Voice recording remains consent-gated in the app; allow only this origin
+		Permissions-Policy "geolocation=(), camera=(), microphone=(self), payment=()"
+	}
+
+	# Block direct public access to internal or API paths if needed
+	# (Note: API routes are typically public in Next.js, but we ensure Postgres/Voice are NOT mapped here)
+
+	# Proxy everything else to Next.js
+	reverse_proxy nextjs:3000 {
+		header_up X-Real-IP {remote}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}

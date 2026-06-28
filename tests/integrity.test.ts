@@ -30,6 +30,7 @@ describe("Release Integrity Verification", () => {
       const genuineCompletedStagingRuns = await db.voiceQaRun.count({
         where: {
           status: "passed",
+          evidenceSource: "manual",
           invalidatedAt: null,
           device: { not: null },
           browser: { not: null },

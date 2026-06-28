@@ -12,7 +12,7 @@
     "start": "next start",
     "rag:embed": "npx tsx scripts/embed-scriptures.ts",
     "rag:evaluate": "npx tsx scripts/evaluate-retrieval.ts",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=0",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:check": "node scripts/check-db.mjs",
@@ -30,7 +30,11 @@
     "scripture:eval": "tsx scripts/evaluate-scripture-retrieval.ts",
     "scripture:prepare-reviews": "tsx scripts/prepare-scripture-reviews.ts",
     "release:check": "tsx scripts/check-release-readiness.ts",
+    "release:verify:local": "npm run db:ready && npm run scripture:validate && tsx scripts/check-local-ai-readiness.ts && npm run scripture:eval && npm run release:check",
+    "source:archive": "node scripts/create-source-archive.mjs",
+    "source:archive:verify": "node scripts/verify-source-archive.mjs",
     "voice:qa:create": "tsx scripts/create-voice-qa-run.ts",
+    "secrets:check": "node scripts/check-secret-containment.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "e2e": "playwright test"
@@ -69,5 +73,9 @@
     "tsx": "^4.20.6",
     "typescript": "^5",
     "vitest": "^4.1.7"
+  },
+  "overrides": {
+    "@hono/node-server": "^1.19.13",
+    "hono": "^4.12.25"
   }
 }

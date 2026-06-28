@@ -39,12 +39,12 @@ async function main() {
       browser,
       personaId,
       notes,
-      status: "passed",
-      completedAt: new Date(),
+      status: "pending",
+      evidenceSource: "manual",
       steps: {
         create: DEFAULT_STEPS.map((stepType) => ({
           stepType,
-          status: "passed",
+          status: "pending",
         })),
       },
     },
@@ -55,10 +55,13 @@ async function main() {
     },
   });
 
-  console.log("Voice QA run created.");
+  console.log("Pending manual Voice QA run created.");
   console.log(`Run ID: ${run.id}`);
   console.log(`Label: ${run.label}`);
   console.log(`Persona: ${run.personaId ?? "not set"}`);
+  console.log(
+    "Complete the manual browser/device protocol before marking it passed.",
+  );
   console.log(`Steps: ${run.steps.map((step) => step.stepType).join(", ")}`);
 }
 

@@ -56,6 +56,7 @@ export async function POST(req: Request) {
         personaId,
         notes,
         status,
+        evidenceSource: "manual",
         completedAt: new Date(),
         steps: {
           create: steps.map((step) => ({

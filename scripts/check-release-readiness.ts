@@ -24,6 +24,7 @@ const REQUIRED_TABLES = [
   "AnswerCitation",
   "VoiceQaRun",
   "VoiceQaStep",
+  "UsabilityDefect",
 ];
 
 const REQUIRED_MIGRATIONS = [
@@ -34,6 +35,8 @@ const REQUIRED_MIGRATIONS = [
   "20260612161000_add_scripture_review_workflow_audit",
   "20260622000000_local_ollama_embeddings",
   "20260622010000_evidence_first_scripture",
+  "20260623143929_phase_6_usability",
+  "20260628160000_voice_qa_evidence_source",
 ];
 
 const CANONICAL_EVAL_FILE = "data/evals/scripture-retrieval/evidence-v2.json";
@@ -218,18 +221,20 @@ async function main() {
         { manifestId: null },
         { edition: null },
         { translator: null },
-        { license: null },
-        { attribution: null },
+        { licenseOrUsageBasis: null },
+        { attributionText: null },
         { ingestionDate: null },
         { copyrightStatus: { notIn: ["public_domain", "licensed"] } },
       ],
     },
   });
-  const invalidVerseChunks = await db.$queryRaw<Array<{ count: bigint }>>`
+  const invalidVerseChunks = await db.$queryRawUnsafe<
+    Array<{ count: bigint }>
+  >(`
     SELECT COUNT(*)::bigint AS "count"
     FROM "ScriptureChunk"
     WHERE "chapter" < 1 OR "verseStart" < 1 OR "verseEnd" < "verseStart"
-  `;
+  `);
   const voiceApprovedPercent =
     totalChunks === 0 ? 0 : (voiceApproved / totalChunks) * 100;
 
@@ -396,7 +401,9 @@ async function main() {
     const completedVoiceQa = await db.voiceQaRun.count({
       where: {
         status: "passed",
+        evidenceSource: "manual",
         completedAt: { not: null },
+        invalidatedAt: null,
         device: { not: null },
         browser: { not: null },
         OR: [
@@ -422,6 +429,24 @@ async function main() {
     );
   }
 
+  // Check for unresolved usability blockers
+  const activeBlockers = await db.usabilityDefect.count({
+    where: {
+      severity: "blocker",
+      resolutionStatus: { in: ["open", "investigating"] },
+    },
+  });
+
+  gates.push(
+    gate(
+      "Zero active usability blockers",
+      activeBlockers === 0,
+      activeBlockers === 0
+        ? "No active blockers."
+        : `${activeBlockers} active usability defect blockers must be resolved.`,
+    ),
+  );
+
   const missingEnv = [
     configured(process.env.DATABASE_URL) ? null : "DATABASE_URL",
     configured(process.env.AUTH_SECRET) ? null : "AUTH_SECRET",
@@ -429,6 +454,12 @@ async function main() {
     configured(process.env.REVIEWER_EMAILS)
       ? null
       : "ADMIN_EMAILS or REVIEWER_EMAILS",
+    configured(process.env.OLLAMA_MAX_CONCURRENCY)
+      ? null
+      : "OLLAMA_MAX_CONCURRENCY",
+    configured(process.env.WHISPER_MAX_CONCURRENCY)
+      ? null
+      : "WHISPER_MAX_CONCURRENCY",
   ].filter((item): item is string => item !== null);
 
   gates.push(
