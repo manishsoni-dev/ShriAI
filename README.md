@@ -53,6 +53,16 @@ cp .env.example .env
 openssl rand -base64 32
 ```
 
+Real `.env` files are local-only and ignored by Git. If a local environment
+file or repository archive was ever shared, follow
+[`docs/security/LOCAL_SECRET_ROTATION.md`](docs/security/LOCAL_SECRET_ROTATION.md)
+and run `npm run secrets:check` before sharing the repository.
+
+Release verification that depends on local Ollama, local STT, reviewed corpus
+state, and real Voice QA evidence must be run on a trusted local machine with
+`npm run release:verify:local`; see
+[`docs/release/LOCAL_RELEASE_VERIFICATION.md`](docs/release/LOCAL_RELEASE_VERIFICATION.md).
+
 4. Configure Postgres using the [Database Setup](#database-setup) section.
 
 5. Install Ollama and pull the local models:
@@ -489,6 +499,7 @@ SHRI_AI_EMBEDDING_DIMENSIONS="1024"
 
 All model and speech base URLs are server-only and restricted to loopback
 hosts. No hosted AI provider or API key is used.
+
 
 ## Knowledge Base
 
