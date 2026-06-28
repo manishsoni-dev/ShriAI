@@ -3,7 +3,9 @@
 This document classifies every modified or untracked file to safely untangle the repository's current state, which contains a mix of P0.1 release-integrity work, P0.2 managed-services-foundation work, and unrelated inherited WIP.
 
 ## P0.1 Release-Integrity Work
+
 Files belonging to P0.1 will be committed separately.
+
 - `.github/workflows/ci.yml` (CI split)
 - `package-lock.json` (audit remediation)
 - `package.json` (audit remediation)
@@ -26,7 +28,9 @@ Files belonging to P0.1 will be committed separately.
 - `tests/release-integrity.test.ts` (Caddy policy docs & tests)
 
 ## P0.2 Managed-Services-Foundation Work
+
 Files belonging to P0.2 will be committed separately.
+
 - `docker-compose.yml` (provider boundaries)
 - `src/app/api/chat/stream/route.test.ts` (provider boundaries)
 - `src/app/api/chat/stream/route.ts` (provider boundaries)
@@ -59,7 +63,9 @@ Files belonging to P0.2 will be committed separately.
 - `tests/managed-services-boundary.test.ts` (architecture documentation)
 
 ## P0.2.1 Work
+
 These files are associated with this specific stabilization phase.
+
 - `docs/development/CURRENT_TASK.md`
 - `prisma/schema.prisma` (Supabase identity-link migration)
 - `src/lib/auth/users.test.ts` (Supabase identity-link mapping correction)
@@ -68,7 +74,9 @@ These files are associated with this specific stabilization phase.
 - `docs/development/BASELINE_RECONCILIATION.md` (This file)
 
 ## Unrelated Inherited WIP / Ignored Files
+
 The following files are either unrelated WIP, runtime generated, or uncertain. They will NOT be staged or committed, but will be preserved on the disk.
+
 - `.env.example`
 - `README.md`
 - `next.config.ts`
