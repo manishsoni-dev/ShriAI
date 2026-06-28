@@ -58,15 +58,21 @@ describe("mutateScriptureReview", () => {
     vi.stubEnv("ADMIN_EMAILS", "");
     // Reset db.user.findUnique to return the reviewer
     vi.mocked(db.user.findUnique).mockResolvedValue({
-      id: "reviewer-user",
+      id: "r1",
+      supabaseAuthUserId: null,
       email: "reviewer@example.com",
-      name: "Reviewer",
-      passwordHash: "x",
+      name: "Reviewer One",
+      passwordHash: "hash",
       imageUrl: null,
       languagePreference: "auto",
+      sourceScope: "any",
       microphoneConsentGivenAt: null,
       microphoneConsentVersion: null,
       onboardedAt: null,
+      researchConsentGivenAt: null,
+      researchConsentVersion: null,
+      researchConsentWithdrawnAt: null,
+      studyModeEnabled: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -96,15 +102,21 @@ describe("mutateScriptureReview", () => {
       expires: new Date(Date.now() + 3_600_000).toISOString(),
     } as unknown as Awaited<ReturnType<typeof auth>>);
     vi.mocked(db.user.findUnique).mockResolvedValueOnce({
-      id: "other-user",
-      email: "random@example.com",
-      name: "Random User",
-      passwordHash: "x",
+      id: "u1",
+      supabaseAuthUserId: null,
+      email: "u1@test.com",
+      name: "User One",
+      passwordHash: "hash",
       imageUrl: null,
       languagePreference: "auto",
+      sourceScope: "any",
       microphoneConsentGivenAt: null,
       microphoneConsentVersion: null,
       onboardedAt: null,
+      researchConsentGivenAt: null,
+      researchConsentVersion: null,
+      researchConsentWithdrawnAt: null,
+      studyModeEnabled: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -277,7 +289,7 @@ describe("mutateScriptureReview", () => {
         data: expect.objectContaining({
           reviewStatus: "approved",
           approvedForVoice: true,
-          reviewedBy: "reviewer-user",
+          reviewedBy: "r1",
           reviewOrigin: "human",
         }),
       }),
@@ -289,7 +301,7 @@ describe("mutateScriptureReview", () => {
         previousStatus: "pending",
         nextStatus: "approved",
         nextApprovedForVoice: true,
-        reviewerUserId: "reviewer-user",
+        reviewerUserId: "r1",
       }),
     });
   });
