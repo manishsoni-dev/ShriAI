@@ -97,7 +97,7 @@ async function main() {
       traceId: `trace-staging-${crypto.randomUUID().substring(0, 8)}`,
       modelConfiguration: "qwen3-8b-local",
       retrievalConfiguration: "hybrid-default",
-      labels: ["too_long"] satisfies FeedbackLabel[],
+      labels: ["confusing"] satisfies FeedbackLabel[],
       notes: "A bit verbose, but accurate.",
     },
   ];

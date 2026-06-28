@@ -14,6 +14,7 @@
 import "dotenv/config";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { createHash } from "node:crypto";
 import { db } from "../src/lib/db";
 import { scriptureFileSchema } from "../src/lib/rag/scripture-schema";
 import {
@@ -192,29 +193,32 @@ async function main() {
       where: { canonicalTitle: sourceMeta.canonicalTitle },
       create: {
         canonicalTitle: sourceMeta.canonicalTitle,
+        sourceName: sourceMeta.canonicalTitle,
         tradition: sourceMeta.tradition,
         language: sourceMeta.language,
         copyrightStatus: sourceMeta.rightsStatus,
         manifestId: sourceMeta.id,
         edition: sourceMeta.edition,
         translator: sourceMeta.translator,
-        license: sourceMeta.license,
-        attribution: sourceMeta.attribution,
-        sourceUrl: sourceMeta.sourceUrl,
+        licenseOrUsageBasis: sourceMeta.license,
+        attributionText: sourceMeta.attribution,
+        sourceUrlOrProvenanceReference: sourceMeta.sourceUrl,
         ingestionDate: new Date(`${sourceMeta.ingestionDate}T00:00:00.000Z`),
+        reviewStatus: "approved", // Automatically approve system-ingested ones
         priority: sourceMeta.priority,
         active: true,
       },
       update: {
+        sourceName: sourceMeta.canonicalTitle,
         tradition: sourceMeta.tradition,
         language: sourceMeta.language,
         copyrightStatus: sourceMeta.rightsStatus,
         manifestId: sourceMeta.id,
         edition: sourceMeta.edition,
         translator: sourceMeta.translator,
-        license: sourceMeta.license,
-        attribution: sourceMeta.attribution,
-        sourceUrl: sourceMeta.sourceUrl,
+        licenseOrUsageBasis: sourceMeta.license,
+        attributionText: sourceMeta.attribution,
+        sourceUrlOrProvenanceReference: sourceMeta.sourceUrl,
         ingestionDate: new Date(`${sourceMeta.ingestionDate}T00:00:00.000Z`),
         priority: sourceMeta.priority,
         active: true,
@@ -236,6 +240,18 @@ async function main() {
           },
         });
 
+        const textToHash = [
+          chunk.canonicalRef,
+          chunk.translation,
+          chunk.commentary ?? "",
+          chunk.practicalNote ?? "",
+          chunk.themeTags.join(","),
+          chunk.emotionTags.join(","),
+          chunk.answerUseCases.join(","),
+        ].join("|");
+
+        const chunkHash = createHash("sha256").update(textToHash).digest("hex");
+
         const data = {
           sourceId: source.id,
           canonicalRef: chunk.canonicalRef,
@@ -252,12 +268,26 @@ async function main() {
           themeTags: chunk.themeTags,
           emotionTags: chunk.emotionTags,
           answerUseCases: chunk.answerUseCases,
+          chunkHash,
         };
 
         if (existing) {
+          const isChanged = existing.chunkHash !== chunkHash;
           await db.scriptureChunk.update({
             where: { id: existing.id },
-            data,
+            data: {
+              ...data,
+              ...(isChanged
+                ? {
+                    embedding: null,
+                    embeddingProvider: null,
+                    embeddingModel: null,
+                    embeddingDimensions: null,
+                    embeddingVersion: null,
+                    embeddingGeneratedAt: null,
+                  }
+                : {}),
+            },
           });
           updatedCount++;
         } else {
