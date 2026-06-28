@@ -22,6 +22,9 @@ vi.mock("@/lib/db", () => ({
     betaInvite: {
       findUnique: vi.fn().mockResolvedValue({ id: "valid-invite" }),
     },
+    featureFlag: {
+      findUnique: vi.fn().mockResolvedValue(null),
+    },
   },
 }));
 

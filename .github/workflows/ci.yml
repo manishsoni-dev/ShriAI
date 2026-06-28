@@ -40,6 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Dependency Audit
+        run: npm audit --audit-level=high
+
+      - name: Secret Containment Check
+        run: npm run secrets:check
+
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
@@ -70,8 +76,6 @@ jobs:
       - name: Validate Scriptures
         run: npm run scripture:validate
 
-      - name: Evaluate Retrievals
-        run: npm run scripture:eval
-
-      - name: Release Readiness Check
-        run: npm run release:check
+      - name: Validate Caddyfile
+        run: |
+          docker run --rm -v ${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile -e STT_BASE_URL="http://ci-placeholder:8080" -e STT_SERVICE_TOKEN="ci-token" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

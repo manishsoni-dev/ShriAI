@@ -11,14 +11,7 @@ ALTER TABLE "DocumentChunk"
 
 UPDATE "ScriptureChunk"
 SET
-  "embedding" = NULL,
-  "embeddingProvider" = NULL,
-  "embeddingModel" = NULL,
-  "embeddingDimensions" = NULL,
-  "embeddingVersion" = NULL,
-  "embeddingGeneratedAt" = NULL,
-  "embeddingCorpusHash" = NULL,
-  "embeddingNormalized" = NULL;
+  "embedding" = NULL;
 
 ALTER TABLE "DocumentChunk"
   ALTER COLUMN "embedding" TYPE vector(1024)
