@@ -29,4 +29,18 @@ export class LocalAIProvider implements AIProvider {
   embedText(input: EmbedTextInput): Promise<EmbedTextResult> {
     return this.embeddings.embedText(input);
   }
+
+  async checkHealth(): Promise<void> {
+    if (
+      "checkHealth" in this.chat &&
+      typeof this.chat.checkHealth === "function"
+    ) {
+      await this.chat.checkHealth();
+    } else if (
+      "checkHealth" in this.embeddings &&
+      typeof this.embeddings.checkHealth === "function"
+    ) {
+      await this.embeddings.checkHealth();
+    }
+  }
 }

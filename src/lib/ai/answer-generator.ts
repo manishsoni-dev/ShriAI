@@ -51,6 +51,8 @@ export const ModelGroundingSchema = z.object({
       reason: z.string().min(1).nullable(),
     })
     .default({ isUncertain: false, reason: null }),
+  retrievalSummary: z.string().optional(),
+  safetyNote: z.string().optional(),
 });
 
 /** @deprecated Model-only schema. Public callers should consume GroundedAnswer. */
@@ -74,6 +76,7 @@ export type GroundedAnswer = {
   citations: PublicCitation[];
   confidence: "high" | "medium" | "low";
   abstained: boolean;
+  retrievalSummary?: string;
   safetyNote?: string;
   /** Compatibility fields retained for existing stream and TTS consumers. */
   spokenAnswer: string;
@@ -233,7 +236,9 @@ The JSON MUST exactly match this structure:
   "spokenAnswer": "The spoken version of your answer, completely free of any markdown, citations, or symbols.",
   "citations": [{"source": "Title", "canonicalRef": "Chapter.Verse", "chunkId": "retrieved chunk id"}],
   "grounding": {"usedRag": true, "confidence": 0.95},
-  "uncertainty": {"isUncertain": false, "reason": null}
+  "uncertainty": {"isUncertain": false, "reason": null},
+  "retrievalSummary": "Briefly summarize how the retrieved texts applied to the user's question.",
+  "safetyNote": "If the query involves a sensitive or crisis topic, provide a brief supportive note. Otherwise, omit this field."
 }
 
 User Query:
@@ -271,22 +276,30 @@ ${input.query}`;
   }
 
   const jsonMarker = buffer.match(/```json/i);
-  if (!jsonMarker || jsonMarker.index === undefined) {
-    throw new Error(
-      "Assistant response did not contain the required JSON metadata block.",
-    );
-  }
-  const displayAnswerBuffer = buffer.slice(0, jsonMarker.index).trim();
-  const jsonBuffer = buffer.slice(jsonMarker.index);
+  let displayAnswerBuffer = "";
+  let jsonContent = "";
 
-  // Extract the JSON string from the markers
-  const jsonContentMatch = jsonBuffer.match(/```json\s*([\s\S]*?)\s*```/i);
-  const jsonContent = jsonContentMatch
-    ? jsonContentMatch[1]
-    : jsonBuffer
-        .replace(/```json/i, "")
-        .replace(/```/i, "")
-        .trim();
+  if (!jsonMarker || jsonMarker.index === undefined) {
+    displayAnswerBuffer = buffer.trim();
+    // Fallback: If local model forgets JSON, synthesize it using full confidence from RAG
+    // to avoid penalizing the entire turn for a formatting error.
+    jsonContent = JSON.stringify({
+      spokenAnswer: displayAnswerBuffer,
+      citations: [], // Can't guess citations reliably if model didn't provide them
+      grounding: { usedRag: true, confidence: input.evidence?.score ?? 0.8 },
+      uncertainty: { isUncertain: false, reason: null },
+    });
+  } else {
+    displayAnswerBuffer = buffer.slice(0, jsonMarker.index).trim();
+    const jsonBuffer = buffer.slice(jsonMarker.index);
+    const jsonContentMatch = jsonBuffer.match(/```json\s*([\s\S]*?)\s*```/i);
+    jsonContent = jsonContentMatch
+      ? jsonContentMatch[1]
+      : jsonBuffer
+          .replace(/```json/i, "")
+          .replace(/```/i, "")
+          .trim();
+  }
 
   let parsedJson;
   try {
@@ -351,6 +364,8 @@ ${input.query}`;
         confidence: evidence?.score ?? validated.grounding.confidence,
       },
       uncertainty,
+      retrievalSummary: validated.retrievalSummary,
+      safetyNote: validated.safetyNote,
       metadata: responseMetadata,
     },
   };

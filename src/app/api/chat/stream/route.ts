@@ -8,7 +8,7 @@ import { type AIMessage } from "@/lib/ai/types";
 import { NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getAIUserFacingMessage } from "@/lib/ai";
+import { AIError, getAIUserFacingMessage } from "@/lib/ai";
 import {
   ConversationAccessError,
   createMessage,
@@ -29,7 +29,13 @@ import {
   getPersonaFromMetadata,
   isPersonaId,
 } from "@/lib/personas";
-import { checkRateLimit, rateLimitResponseHeaders } from "@/lib/rate-limit";
+import {
+  checkConcurrency,
+  checkRateLimit,
+  rateLimitResponseHeaders,
+  releaseConcurrency,
+} from "@/lib/rate-limit";
+import { env } from "@/env";
 import {
   formatScriptureContextForPrompt,
   retrieveScriptureContext,
@@ -91,8 +97,13 @@ function doneEvent(input: {
   };
 }
 
-function safePreview(content: string) {
-  return content.replace(/\s+/g, " ").trim().slice(0, 160);
+function localAIErrorCode(error: unknown) {
+  if (!(error instanceof AIError)) return "LOCAL_AI_UNAVAILABLE";
+  if (error.code === "AI_BAD_REQUEST") return "LOCAL_MODEL_MISSING";
+  if (error.code === "AI_TIMEOUT" || error.code === "AI_UNAVAILABLE") {
+    return "LOCAL_AI_UNAVAILABLE";
+  }
+  return "LOCAL_AI_UNAVAILABLE";
 }
 
 const HISTORY_MAX_MESSAGES = 12;
@@ -281,6 +292,14 @@ export async function POST(request: Request) {
     );
   }
 
+  let concurrencyReleased = false;
+  const release = () => {
+    if (!concurrencyReleased) {
+      releaseConcurrency("ollama_chat");
+      concurrencyReleased = true;
+    }
+  };
+
   const body = (await request.json().catch(() => null)) as StreamRequest | null;
   const conversationId = body?.conversationId;
   const content = body?.message?.trim();
@@ -405,7 +424,6 @@ export async function POST(request: Request) {
         model: "crisis-routing",
         latencyMs: Date.now() - startedAt,
         payload: {
-          contentPreview: safePreview(content),
           contentLength: content.length,
           interactionMode,
           safetyRoute: "crisis",
@@ -464,12 +482,44 @@ export async function POST(request: Request) {
         },
       });
 
-      return new Response(stream, {
+      const wrappedStream = new ReadableStream({
+        async start(controller) {
+          const reader = stream.getReader();
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+            controller.close();
+          } catch (e) {
+            controller.error(e);
+          } finally {
+            release();
+          }
+        },
+        cancel() {
+          release();
+        },
+      });
+
+      return new Response(wrappedStream, {
         headers: {
           "Cache-Control": "no-cache, no-transform",
           "Content-Type": "application/x-ndjson; charset=utf-8",
         },
       });
+    }
+
+    if (!checkConcurrency("ollama_chat", env.OLLAMA_MAX_CONCURRENCY)) {
+      return NextResponse.json(
+        {
+          code: "LOCAL_AI_UNAVAILABLE",
+          error:
+            "Local AI is currently at maximum capacity. Please try again in a few moments.",
+        },
+        { status: 503, headers: { "Retry-After": "5" } },
+      );
     }
 
     // ── Parallel: scripture RAG + workspace document search ─────────────────
@@ -651,7 +701,6 @@ export async function POST(request: Request) {
             latencyMs: Date.now() - startedAt,
             payload: {
               contentLength: content.length,
-              contentPreview: safePreview(content),
               firstTokenLatencyMs,
               finalStatus: "completed",
               historyMessages: history.length,
@@ -731,8 +780,10 @@ export async function POST(request: Request) {
             latencyMs: Date.now() - startedAt,
             payload: {
               contentLength: content.length,
-              contentPreview: safePreview(content),
-              error: error instanceof Error ? error.message : String(error),
+              errorClass:
+                error instanceof Error
+                  ? error.constructor.name
+                  : "UnknownError",
               finalStatus: "failed",
               interactionMode,
               turnId,
@@ -743,6 +794,7 @@ export async function POST(request: Request) {
             encoder.encode(
               streamEvent({
                 type: "error",
+                code: localAIErrorCode(error),
                 error: message,
                 traceId,
                 turnId,
@@ -759,7 +811,28 @@ export async function POST(request: Request) {
       },
     });
 
-    return new Response(stream, {
+    const wrappedStream = new ReadableStream({
+      async start(controller) {
+        const reader = stream.getReader();
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+          controller.close();
+        } catch (e) {
+          controller.error(e);
+        } finally {
+          release();
+        }
+      },
+      cancel() {
+        release();
+      },
+    });
+
+    return new Response(wrappedStream, {
       headers: {
         "Cache-Control": "no-cache, no-transform",
         "Content-Type": "application/x-ndjson; charset=utf-8",
@@ -770,6 +843,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
+    release();
     throw error;
   }
 }

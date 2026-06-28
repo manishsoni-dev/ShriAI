@@ -199,7 +199,7 @@ describe("streamGroundedAnswer", () => {
     }).rejects.toThrow("AbortError");
   });
 
-  it("throws if no JSON block is provided by the model", async () => {
+  it("abstains gracefully if no JSON block is provided by the model", async () => {
     async function* mockStream() {
       yield { type: "text-delta" as const, text: "I forgot the JSON." };
     }
@@ -213,14 +213,18 @@ describe("streamGroundedAnswer", () => {
       insufficientContext: false,
     });
 
-    await expect(async () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      for await (const _event of stream) {
-        // iter
-      }
-    }).rejects.toThrow(
-      "Assistant response did not contain the required JSON metadata block.",
-    );
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({
+      type: "done",
+      answer: {
+        abstained: true,
+        confidence: "low",
+      },
+    });
   });
 
   it("abstains before emitting fabricated citations", async () => {
@@ -287,9 +291,18 @@ describe("streamGroundedAnswer", () => {
       retrievedChunks,
       evidence: strongEvidence,
     });
-    await expect(async () => {
-      for await (const _event of stream) void _event;
-    }).rejects.toThrow("required JSON metadata block");
+    const events: StreamEvent[] = [];
+    for await (const event of stream) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({
+      type: "done",
+      answer: {
+        abstained: true,
+        confidence: "low",
+      },
+    });
 
     const request = vi.mocked(aiProvider.streamChat).mock.calls[0]![0];
     expect(request.messages[0]!.content).toContain(
@@ -305,6 +318,8 @@ describe("streamGroundedAnswer", () => {
       spokenAnswer: "test",
       citations: [{ source: "A", canonicalRef: "1.1" }],
       grounding: { usedRag: false, confidence: 0.5 },
+      retrievalSummary: "Test summary",
+      safetyNote: "If needed",
     };
     expect(() => GroundedAnswerSchema.parse(valid)).not.toThrow();
   });

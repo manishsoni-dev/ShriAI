@@ -20,4 +20,8 @@ export class LocalOllamaChatProvider implements ChatProvider {
   generateText(input: GenerateTextInput): Promise<GenerateTextResult> {
     return this.transport.generateText(input);
   }
+
+  checkHealth(): Promise<void> {
+    return this.transport.checkHealth();
+  }
 }

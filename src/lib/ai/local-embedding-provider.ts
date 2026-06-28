@@ -14,4 +14,8 @@ export class LocalEmbeddingProvider implements EmbeddingProvider {
   embedText(input: EmbedTextInput): Promise<EmbedTextResult> {
     return this.transport.embedText(input);
   }
+
+  checkHealth(): Promise<void> {
+    return this.transport.checkHealth();
+  }
 }

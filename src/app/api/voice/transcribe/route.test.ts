@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/env", () => ({ env: mocks.env }));
 vi.mock("@/lib/db", () => ({
-  db: { user: { findUnique: mocks.userFindUnique } },
+  db: {
+    user: { findUnique: mocks.userFindUnique },
+    featureFlag: { findUnique: vi.fn().mockResolvedValue({ enabled: true }) },
+  },
 }));
 vi.mock("@/lib/observability", () => ({
   logObservabilityEvent: mocks.logObservabilityEvent,
@@ -24,6 +27,8 @@ vi.mock("@/lib/observability", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: mocks.checkRateLimit,
   rateLimitResponseHeaders: () => ({}),
+  checkConcurrency: vi.fn(() => true),
+  releaseConcurrency: vi.fn(),
 }));
 
 import { POST } from "./route";
@@ -183,6 +188,7 @@ describe("POST /api/voice/transcribe", () => {
     const response = await POST(requestWithAudio());
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
+      code: "LOCAL_STT_UNAVAILABLE",
       error: expect.stringContaining("type your question"),
       voiceTraceId: "trace-stt",
     });

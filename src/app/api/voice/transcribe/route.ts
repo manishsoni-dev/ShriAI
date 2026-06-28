@@ -7,7 +7,13 @@ import { auth } from "@/auth";
 import { env } from "@/env";
 import { db } from "@/lib/db";
 import { logObservabilityEvent } from "@/lib/observability";
-import { checkRateLimit, rateLimitResponseHeaders } from "@/lib/rate-limit";
+import {
+  checkConcurrency,
+  checkRateLimit,
+  rateLimitResponseHeaders,
+  releaseConcurrency,
+} from "@/lib/rate-limit";
+import { getFeatureFlag } from "@/lib/feature-flags";
 import { hasStoredMicrophoneConsent } from "@/lib/voice/consent";
 import {
   LocalSpeechClient,
@@ -38,6 +44,7 @@ type VoiceErrorCode =
   | "INVALID_MULTIPART"
   | "MISSING_AUDIO"
   | "NO_SPEECH"
+  | "LOCAL_STT_UNAVAILABLE"
   | "RATE_LIMITED"
   | "TRANSCRIPTION_TIMEOUT"
   | "TRANSCRIPTION_UNAVAILABLE"
@@ -61,6 +68,14 @@ export async function POST(request: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!(await getFeatureFlag("voice_input"))) {
+    return voiceError(
+      "LOCAL_STT_UNAVAILABLE",
+      "Voice input is currently disabled.",
+      503,
+    );
   }
 
   const user = await db.user.findUnique({
@@ -164,6 +179,16 @@ export async function POST(request: Request) {
     voiceServiceToken: env.STT_SERVICE_TOKEN,
   });
 
+  if (!checkConcurrency("whisper_transcribe", env.WHISPER_MAX_CONCURRENCY)) {
+    return voiceError(
+      "RATE_LIMITED",
+      "Transcription service is at maximum capacity. Please try again in a few moments.",
+      503,
+      safeTraceId,
+      { "Retry-After": "5" },
+    );
+  }
+
   try {
     const transcript = await client.transcribe({
       audio: audioField,
@@ -214,7 +239,8 @@ export async function POST(request: Request) {
       payload: {
         provider: "local-whisper",
         audioBytes: audioField.size,
-        error: error instanceof Error ? error.message : String(error),
+        errorClass:
+          error instanceof Error ? error.constructor.name : "UnknownError",
       },
     });
     return voiceError(
@@ -223,6 +249,8 @@ export async function POST(request: Request) {
       status,
       safeTraceId,
     );
+  } finally {
+    releaseConcurrency("whisper_transcribe");
   }
 }
 
@@ -253,7 +281,7 @@ function transcriptionError(error: unknown, status: number) {
     };
   }
   return {
-    code: "TRANSCRIPTION_UNAVAILABLE" as const,
+    code: "LOCAL_STT_UNAVAILABLE" as const,
     message:
       "Local speech transcription is unavailable. Start the faster-whisper service or type your question.",
   };

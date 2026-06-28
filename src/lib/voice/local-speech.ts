@@ -96,6 +96,17 @@ export class LocalSpeechClient {
     } satisfies LocalTranscript;
   }
 
+  async checkHealth(): Promise<void> {
+    if (!this.voiceServiceToken) {
+      throw new LocalSpeechError(
+        "LOCAL_SPEECH_UNAVAILABLE",
+        "The local voice service token is not configured.",
+        false,
+      );
+    }
+    await this.request(`${this.sttBaseUrl}/health`, { method: "GET" });
+  }
+
   private async retry(operation: () => Promise<Response>) {
     let lastError: unknown;
     for (let attempt = 0; attempt < 2; attempt += 1) {

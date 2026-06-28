@@ -70,4 +70,7 @@ export type EmbeddingProvider = {
   embedText(input: EmbedTextInput): Promise<EmbedTextResult>;
 };
 
-export type AIProvider = ChatProvider & EmbeddingProvider;
+export type AIProvider = ChatProvider &
+  EmbeddingProvider & {
+    checkHealth?(): Promise<void>;
+  };

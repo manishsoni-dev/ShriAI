@@ -160,9 +160,12 @@ export class LocalOllamaProvider implements AIProvider {
       options.embeddingModel ?? ollamaConfig.models.embeddingModel;
     this.embeddingDimensions =
       options.embeddingDimensions ?? ollamaConfig.models.embeddingDimensions;
-    this.chatTimeoutMs = options.chatTimeoutMs ?? ollamaConfig.chatTimeoutMs;
-    this.embeddingTimeoutMs =
-      options.embeddingTimeoutMs ?? ollamaConfig.embeddingTimeoutMs;
+    this.chatTimeoutMs = parseInt(
+      process.env.SHRI_AI_CHAT_TIMEOUT_MS || "900000",
+    );
+    this.embeddingTimeoutMs = parseInt(
+      process.env.SHRI_AI_EMBEDDING_TIMEOUT_MS || "120000",
+    );
     this.fetchFn = options.fetchFn ?? fetch;
   }
 
@@ -179,7 +182,14 @@ export class LocalOllamaProvider implements AIProvider {
           model,
           messages: toOllamaMessages(input.messages),
           stream: true,
-          options: { temperature: input.temperature },
+          // Disable extended thinking for qwen3 and similar reasoning models.
+          // Content is delivered in message.content only when think=false.
+          think: false,
+          options: {
+            temperature: input.temperature,
+            num_predict: 1024,
+            num_ctx: 8192,
+          },
         }),
         signal: timer.signal,
       });
@@ -267,7 +277,13 @@ export class LocalOllamaProvider implements AIProvider {
             model,
             messages: toOllamaMessages(input.messages),
             stream: false,
-            options: { temperature: input.temperature },
+            // Disable extended thinking for qwen3 and similar reasoning models.
+            think: false,
+            options: {
+              temperature: input.temperature,
+              num_predict: 1024,
+              num_ctx: 8192,
+            },
           },
           this.chatTimeoutMs,
           input.signal,
@@ -321,6 +337,25 @@ export class LocalOllamaProvider implements AIProvider {
       },
       { provider: PROVIDER_NAME, attempts: 2 },
     );
+  }
+
+  async checkHealth(): Promise<void> {
+    const timer = timedSignal(undefined, 5000);
+    try {
+      const response = await this.fetchFn(`${this.baseUrl}/api/version`, {
+        method: "GET",
+        signal: timer.signal,
+      });
+      if (!response.ok) {
+        throw await responseError(response);
+      }
+    } catch (error) {
+      if (timer.timedOut()) throw timeoutError(error);
+      if (error instanceof AIError) throw error;
+      throw unavailable("Local Ollama is not reachable.", undefined, error);
+    } finally {
+      timer.cleanup();
+    }
   }
 
   private async fetchJson(

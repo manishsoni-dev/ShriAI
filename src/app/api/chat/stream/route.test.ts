@@ -73,6 +73,8 @@ vi.mock("@/lib/rate-limit", () => ({
   rateLimitResponseHeaders: (retryAfterMs: number) => ({
     "Retry-After": String(Math.max(1, Math.ceil(retryAfterMs / 1000))),
   }),
+  checkConcurrency: vi.fn(() => true),
+  releaseConcurrency: vi.fn(),
 }));
 
 vi.mock("@/lib/safety/crisis", () => ({
@@ -409,6 +411,7 @@ describe("POST /api/chat/stream authorization", () => {
     expect(events).toContainEqual(
       expect.objectContaining({
         type: "error",
+        code: "LOCAL_AI_UNAVAILABLE",
         error:
           "Local AI is unavailable. Start Ollama and confirm the configured model is installed.",
       }),

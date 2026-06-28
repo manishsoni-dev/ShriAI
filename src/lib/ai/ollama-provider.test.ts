@@ -66,7 +66,9 @@ describe("LocalOllamaProvider", () => {
         { role: "user", content: "Help me act." },
       ],
       stream: true,
-      options: { temperature: 0.2 },
+      // think: false disables extended reasoning for qwen3 and similar models
+      think: false,
+      options: { temperature: 0.2, num_predict: 1024, num_ctx: 8192 },
     });
     expect(events).toEqual([
       { type: "text-delta", text: "Steady" },
@@ -137,18 +139,23 @@ describe("LocalOllamaProvider", () => {
     const fetchFn = vi.fn<typeof fetch>().mockImplementation(
       (_url, init) =>
         new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(new DOMException("Aborted", "AbortError")),
-          );
+          if (init?.signal?.aborted) {
+            return reject(new DOMException("Aborted", "AbortError"));
+          }
+          init?.signal?.addEventListener("abort", () => {
+            reject(new DOMException("Aborted", "AbortError"));
+          });
         }),
     );
     const result = provider(fetchFn, { chatTimeoutMs: 10 }).generateText({
       messages: [{ role: "user", content: "hello" }],
     });
+
     const rejection = expect(result).rejects.toMatchObject({
       code: "AI_TIMEOUT",
     });
-    await vi.advanceTimersByTimeAsync(1_000);
+
+    await vi.runAllTimersAsync();
     await rejection;
     vi.useRealTimers();
   });
@@ -166,6 +173,24 @@ describe("LocalOllamaProvider", () => {
     };
     await expect(consume()).rejects.toMatchObject({
       code: "AI_INVALID_RESPONSE",
+    });
+  });
+
+  it("checkHealth returns quietly if Ollama is available", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(new Response());
+    await expect(provider(fetchFn).checkHealth()).resolves.toBeUndefined();
+    expect(fetchFn).toHaveBeenCalledWith(
+      "http://127.0.0.1:11434/api/version",
+      expect.any(Object),
+    );
+  });
+
+  it("checkHealth throws if Ollama is unavailable", async () => {
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockRejectedValue(new TypeError("fetch failed"));
+    await expect(provider(fetchFn).checkHealth()).rejects.toMatchObject({
+      code: "AI_UNAVAILABLE",
     });
   });
 });
