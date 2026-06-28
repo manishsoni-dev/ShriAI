@@ -43,7 +43,27 @@ function getErrorMessage(error?: string) {
     return "Document could not be found.";
   }
 
+  if (error === "ingestion-failed") {
+    return "Document was stored, but text extraction or embeddings failed. It is marked failed and will not be used in search.";
+  }
+
   return null;
+}
+
+function getStatusCopy(status: string, chunks: number) {
+  if (status === "ready") {
+    return `${chunks} searchable chunks`;
+  }
+
+  if (status === "failed") {
+    return "Ingestion failed · not searchable";
+  }
+
+  if (status === "processing") {
+    return "Processing · not searchable yet";
+  }
+
+  return "Uploaded · not searchable yet";
 }
 
 export default async function KnowledgePage({
@@ -147,7 +167,7 @@ export default async function KnowledgePage({
 
             {params.uploaded ? (
               <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                Document uploaded.
+                Document uploaded, processed, and ready for search.
               </p>
             ) : null}
 
@@ -197,7 +217,7 @@ export default async function KnowledgePage({
                         Uploaded by{" "}
                         {document.uploadedBy.name ?? document.uploadedBy.email}
                         {" · "}
-                        {document._count.chunks} chunks
+                        {getStatusCopy(document.status, document._count.chunks)}
                       </p>
                     </div>
                     <div className="flex items-center gap-3">
