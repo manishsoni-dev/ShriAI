@@ -5,6 +5,46 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { verifySourceArchive } from "./verify-source-archive.mjs";
 
+export const archiveExcludePathspecs = [
+  ".env*",
+  "**/.env*",
+  ".git",
+  ".git/**",
+  "node_modules",
+  "node_modules/**",
+  ".next",
+  ".next/**",
+  "venv",
+  "venv/**",
+  ".venv",
+  ".venv/**",
+  "storage",
+  "storage/**",
+  "uploads",
+  "uploads/**",
+  "playwright-report",
+  "playwright-report/**",
+  "test-results",
+  "test-results/**",
+  "coverage",
+  "coverage/**",
+  "eval-results",
+  "eval-results/**",
+  "eval_output.txt",
+  "*.log",
+  "**/*.log",
+  "*.sqlite",
+  "**/*.sqlite",
+  "*.sqlite3",
+  "**/*.sqlite3",
+  "*.db",
+  "**/*.db",
+  "data/evals",
+  "data/evals/**",
+  "eval-run-*.json",
+  "**/eval-run-*.json",
+];
+
 function git(args) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
@@ -25,24 +65,31 @@ function createArchive() {
   mkdirSync(outDir, { recursive: true });
   const archivePath = path.join(outDir, `shri-ai-source-${sha}.zip`);
 
-  execFileSync("git", [
+  const archiveArgs = [
     "archive",
     "--format=zip",
     "--output",
     archivePath,
     "HEAD",
-  ]);
+    "--",
+    ".",
+    ...archiveExcludePathspecs.map((pattern) => `:(exclude)${pattern}`),
+  ];
+
+  execFileSync("git", archiveArgs);
 
   verifySourceArchive(archivePath);
   return archivePath;
 }
 
-try {
-  const archivePath = createArchive();
-  console.log(
-    `Source archive created: ${path.relative(process.cwd(), archivePath)}`,
-  );
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    const archivePath = createArchive();
+    console.log(
+      `Source archive created: ${path.relative(process.cwd(), archivePath)}`,
+    );
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  }
 }
