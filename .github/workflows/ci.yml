@@ -6,6 +6,19 @@ on:
   pull_request:
 
 jobs:
+  caddy-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate Caddyfile
+        run: |
+          docker run --rm \
+            -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.8.4-alpine \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
   build-and-test:
     runs-on: ubuntu-latest
 
@@ -79,7 +92,3 @@ jobs:
 
       - name: Validate Scriptures
         run: npm run scripture:validate
-
-      - name: Validate Caddyfile
-        run: |
-          docker run --rm -v ${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile -e STT_BASE_URL="http://ci-placeholder:8080" -e STT_SERVICE_TOKEN="ci-token" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
