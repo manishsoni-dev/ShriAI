@@ -78,4 +78,4 @@ jobs:
 
       - name: Validate Caddyfile
         run: |
-          docker run --rm -v ${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile -e STT_BASE_URL="http://ci-placeholder:8080" -e STT_SERVICE_TOKEN="ci-token" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run --rm -v ${{ github.workspace }}/Caddyfile:/etc/caddy/Caddyfile -e STT_BASE_URL="http://ci-placeholder:8080" -e STT_SERVICE_TOKEN="ci-token" caddy:2.8.4-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile

@@ -45,11 +45,15 @@ describe("release integrity configuration", () => {
 
   it("pins Caddy CI validation configuration", () => {
     const ci = readFileSync(".github/workflows/ci.yml", "utf8");
-    expect(ci).toContain("caddy:2-alpine");
+    const compose = readFileSync("docker-compose.yml", "utf8");
+    expect(ci).toContain("caddy:2.8.4-alpine");
+    expect(compose).toContain("caddy:2.8.4-alpine");
     expect(ci).toContain(
       "caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile",
     );
     expect(ci).not.toContain("caddy:latest");
+    expect(ci).not.toContain("caddy:2-alpine");
+    expect(compose).not.toContain("caddy:2-alpine");
   });
 
   it("requires source archives to be created from clean tracked commits", () => {
