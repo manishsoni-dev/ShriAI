@@ -123,6 +123,10 @@ git status --short
   passed, 2 files / 9 tests.
 - `npm run typecheck`: passed.
 - `git diff --check`: passed.
+- `npm run source:archive`: passed from clean committed branch
+  `2033a24`, creating `dist/source-archives/shri-ai-source-2033a24.zip`.
+- `npm run source:archive:verify -- dist/source-archives/shri-ai-source-2033a24.zip`:
+  passed, 401 entries.
 
 ### Checks Passed
 
@@ -130,6 +134,8 @@ git status --short
 - Archive creator now has explicit Git pathspec exclusions matching the unsafe
   archive classes covered by the verifier.
 - Targeted release/source-archive tests pass.
+- The corrected archive creator successfully generated and verified a ZIP from
+  a clean committed branch tree.
 
 ### Checks Failed
 
@@ -138,8 +144,8 @@ git status --short
 
 ### Remaining Blockers
 
-- Correction needs validation, commit, push, hosted CI, merge, and then a fresh
-  archive generated from the corrected clean committed tree.
+- Correction needs push, hosted CI, merge, and then a fresh archive generated
+  from corrected `main`.
 - Manual external secret rotation and old shared ZIP removal remain
   maintainer-owned.
 
