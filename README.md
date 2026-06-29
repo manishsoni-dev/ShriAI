@@ -63,6 +63,10 @@ state, and real Voice QA evidence must be run on a trusted local machine with
 `npm run release:verify:local`; see
 [`docs/release/LOCAL_RELEASE_VERIFICATION.md`](docs/release/LOCAL_RELEASE_VERIFICATION.md).
 
+Safe source archives must be created only from clean committed trees with
+`npm run source:archive`; the archive verifier rejects environment files,
+runtime outputs, databases, logs, uploads, `.git`, `node_modules`, and `.next`.
+
 4. Configure Postgres using the [Database Setup](#database-setup) section.
 
 5. Install Ollama and pull the local models:
@@ -260,6 +264,13 @@ the control unavailable instead of crashing.
 - `npm run scripture:prepare-reviews` idempotently creates missing pending review rows without resetting completed reviews.
 - `npm run scripture:eval` runs the canonical evidence-v2 evaluation with 50 grounded cases plus adversarial abstention, injection, and crisis cases.
 - `npm run release:check` verifies DB, migration, provenance, review, retrieval, fresh canonical evaluation, environment, and Voice QA readiness gates.
+- `npm run release:verify:local` runs local-only release verification requiring
+  Postgres, reviewed scripture data, local Ollama, local STT, canonical
+  retrieval eval, and real manual Voice QA evidence.
+- `npm run secrets:check` verifies that tracked source does not include real
+  environment files or known secret patterns.
+- `npm run source:archive` creates a verified tracked-source archive from a
+  clean commit only.
 - `npm run format` formats files with Prettier.
 - `npm run format:check` verifies formatting without changing files.
 
@@ -291,12 +302,15 @@ clone checks against a disposable `pgvector/pgvector:pg16` Postgres service:
 
 ```text
 npm ci -> prisma:generate -> prisma validate -> prisma migrate deploy ->
-format:check -> lint -> typecheck -> test -> build -> db:ready
+secrets:check -> format:check -> lint -> typecheck -> test -> build -> db:ready
 ```
 
 CI uses placeholder non-secret values only where build-time validation requires
 environment variables. Unit tests mock localhost services, so CI does not need
-Ollama, Whisper, or API keys.
+Ollama, Whisper, or API keys. Hosted CI intentionally does not run
+`scripture:eval` or `release:check`; those are covered by
+`npm run release:verify:local` on a trusted machine with local model services
+and real manual Voice QA evidence.
 
 ## Scripture RAG
 

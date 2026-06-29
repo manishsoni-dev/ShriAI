@@ -11,7 +11,7 @@ This guide describes how to run Shri AI in a secure, local-first production envi
 ## Local Setup vs Production
 
 - **Local Dev:** Run `npm run dev` and `docker compose -f docker-compose.yml up -d postgres voice` to develop.
-- **Production MVP:** Run `docker compose up -d --build`. This starts Postgres, the Next.js standalone app, the Python Voice STT service, and Caddy (reverse proxy).
+- **Production MVP:** Run `docker compose up -d --build`. This starts Postgres, the Next.js standalone app, the Python Voice STT service, and Caddy (reverse proxy). Caddy is pinned to `caddy:2.8.4-alpine` and the same image validates `Caddyfile` in hosted CI.
 
 ### 1. Database Migration & Startup
 

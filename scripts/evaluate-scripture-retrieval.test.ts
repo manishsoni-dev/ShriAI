@@ -37,6 +37,9 @@ describe("evaluate-scripture-retrieval local AI failure handling", () => {
           encoding: "utf8",
           env: {
             ...process.env,
+            AUTH_SECRET: "test-auth-secret-at-least-32-characters",
+            DATABASE_URL:
+              "postgresql://postgres:postgres@localhost:5432/shri_ai?schema=public",
             OLLAMA_BASE_URL: "http://127.0.0.1:9",
             SHRI_AI_CHAT_MODEL: "qwen3:8b",
             SHRI_AI_EMBEDDING_MODEL: "qwen3-embedding:0.6b",

@@ -13,7 +13,7 @@ COPY . .
 
 # Environment variables needed for Prisma generation and build
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-ENV AUTH_SECRET="dummy_secret_for_build_step_only"
+ENV AUTH_SECRET="dummy-secret-for-build-step-only-32-chars"
 
 RUN npm run prisma:generate
 RUN npm run build
