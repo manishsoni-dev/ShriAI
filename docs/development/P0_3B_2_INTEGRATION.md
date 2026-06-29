@@ -2,73 +2,58 @@
 
 ## Branch and Worktree Topology
 
-Preflight commands were run before integration and re-run after the current-main
-merge:
+Verified topology after refreshing PR #4 against current main:
 
-- `git fetch origin --prune`: passed.
-- `git worktree list`: recorded these worktrees:
-  - `/Users/manishh/Desktop/Shri AI` on
-    `codex/p0-3b-1-auth-certification` at `23dd098`.
-  - `/Users/manishh/Desktop/Shri AI P0.1 Clean` on
-    `codex/p0-1-release-integrity` at `bb7c31a`.
-  - `/Users/manishh/Desktop/Shri AI P0.2 Clean` on
-    `codex/p0-2-managed-services-foundation-clean` at `d02981c`.
-  - `/Users/manishh/Desktop/Shri AI P0.3B.2` on
-    `codex/p0-3b-2-integration-staging-certification` at `e60c23b` before this
-    documentation refresh.
-  - `/Users/manishh/Desktop/ShriAI-p0-3a` on
-    `codex/p0-3a-supabase-auth-foundation` at `7446ce0`.
-  - `/Users/manishh/Desktop/ShriAI-p0-baseline` on `main` at `4786bbd`.
-- `git branch -a --contains 23dd098`: only local/remote
-  `codex/p0-3b-1-auth-certification`.
-- `git cat-file -e 23dd098^{commit}`: passed.
-- `git log --oneline origin/main..23dd098`: P0.3A foundation, P0.3B.1
-  certification, and one source-archive commit with its revert.
-- `git diff --name-status origin/main...23dd098`: net diff is P0.3 auth,
-  Supabase, route, test, and documentation work. The reverted source-archive
-  files are absent from the net diff.
-- `git show --stat 23dd098`: five-file P0.3B.1 certification delta.
-- `git status --short` in the original P0.3B.1 worktree: clean.
-- The existing P0.3B.2 branch was verified clean, then current `origin/main`
-  (`cbade94`) was merged with a normal merge commit. No rebase, force-push, or
-  history rewrite was used.
-
-## Commit Relationships
-
-- Current `origin/main` is `cbade94`, `Merge P0.1 release integrity hardening`.
-- Current P0.3B.2 merge base with `origin/main` is `cbade94`.
-- P0.3B.2 is ahead of `origin/main` by:
+- Worktree: `/Users/manishh/Desktop/Shri AI P0.3B.2`.
+- Branch: `codex/p0-3b-2-integration-staging-certification`.
+- Current branch head after merge: `2493ef0 Merge origin/main into P0.3B.2
+after P0.2 gates`.
+- Current `origin/main`: `68c521a Merge pull request #6 from
+manishsoni-dev/codex/source-archive-safety-correction`.
+- Current merge base with `origin/main`: `68c521a`.
+- Current P0.3B.2 commits ahead of `origin/main`:
+  - `2493ef0 Merge origin/main into P0.3B.2 after P0.2 gates`.
+  - `ea723cd docs: record p0.3b.2 stale main state`.
+  - `fbf987f docs: refresh p0.3b.2 certification topology`.
   - `e60c23b Merge origin/main into P0.3B.2 certification`.
   - `b713baf feat: certify p0.3b integration recovery`.
-- P0.1 release integrity work is merged into `origin/main` through PR #2.
-- P0.2 managed-service boundary work is represented in historical baseline main
-  through `477f237`; the later clean P0.2 worktree remains separate and
-  untouched.
-- P0.3A exists on `codex/p0-3a-supabase-auth-foundation` ending at `7446ce0`.
-- P0.3B.1 exists on `codex/p0-3b-1-auth-certification` ending at `23dd098`.
-- P0.3B.2 integrates the net P0.3A/P0.3B.1 auth-staging diff without the
-  reverted source-archive history.
+- `git diff --name-status origin/main...HEAD` is limited to P0.3B.2 auth,
+  Supabase, route, test, CI/test-environment, research, staging, and task
+  documentation files.
+- The latest current-main merge conflicted only in
+  `docs/development/CURRENT_TASK.md`; the conflict was resolved by preserving
+  the active P0.3B.2 ledger while inheriting current-main P0.2 and
+  source-archive safety changes.
+
+## P0 Status
+
+- P0.1 is merged into `origin/main` through PR #2.
+- P0.2 is merged into `origin/main` through PR #5.
+- Source archive safety correction is merged into `origin/main` through PR #6.
+- P0.3A remains represented by historical branch
+  `codex/p0-3a-supabase-auth-foundation`.
+- P0.3B.1 remains represented by historical branch
+  `codex/p0-3b-1-auth-certification` at `23dd098`.
+- P0.3B.2 is the active integration PR that supersedes PR #3 for staging
+  integration.
 
 ## Pull Request Status
 
-- PR #4, `[codex] Recover P0.3B staging integration`, is the active P0.3B.2
-  draft PR from `codex/p0-3b-2-integration-staging-certification` to `main`.
-  GitHub reported it clean with passing CI and ArchGuard before the current-main
-  merge; checks must rerun after this update is pushed.
-- PR #3, `[codex] Certify P0.3B.1 auth cutover`, is superseded by PR #4 because
-  P0.3B.2 rebuilds the net P0.3B.1 diff and adds deterministic CI/test
-  environment controls.
-- PR #1, `P0 trust hardening: privacy-safe logs and truthful uploads`, is
-  unrelated to P0.3B.2 and merge-dirty.
+- PR #4, `[codex] Recover P0.3B staging integration`, is the active P0.3B.2 PR.
+  Its previous checks were green but stale before the latest current-main
+  refresh. Checks must rerun after this branch is pushed.
+- PR #3 is superseded by PR #4.
+- PR #1 is unrelated and out of scope.
 
 ## Preserved Worktrees
 
-- `/Users/manishh/Desktop/Shri AI`: clean P0.3B.1 worktree, untouched after
-  preflight.
-- `/Users/manishh/Desktop/Shri AI P0.1 Clean`: clean, untouched.
-- `/Users/manishh/Desktop/Shri AI P0.2 Clean`: clean, untouched.
-- `/Users/manishh/Desktop/ShriAI-p0-3a`: clean, untouched.
-- `/Users/manishh/Desktop/ShriAI-p0-baseline`: clean, untouched.
+- `/Users/manishh/Desktop/Shri AI`: P0.3B.1 worktree, not modified by this
+  continuation.
+- `/Users/manishh/Desktop/Shri AI P0.1 Clean`: P0.1 worktree, not modified.
+- `/Users/manishh/Desktop/Shri AI P0.2 Clean`: P0.2 worktree, not modified.
+- `/Users/manishh/Desktop/ShriAI-p0-3a`: P0.3A worktree, not modified.
+- `/Users/manishh/Desktop/ShriAI-p0-baseline`: main/source-archive worktree,
+  not modified by this P0.3B.2 continuation.
 
 ## Changed Files and Purpose
 
@@ -80,17 +65,18 @@ merge:
 - Test database safety files: `check-test-database-url.mjs`,
   `test:db:preflight`, and unit tests for rejecting unsafe test DB targets.
 - Documentation: P0.3B.1 certification, P0.3B.2 integration report, Supabase
-  migration/staging docs, and research decision log.
+  migration/staging docs, research decision log, and task ledger.
 
 ## No Unrelated Work Entered
 
-The branch contains current `origin/main` plus the P0.3B.2 integration commit.
-The current `origin/main...HEAD` diff is limited to P0.3B.2 auth, Supabase,
-route, test, CI/test-environment, and documentation files. The reverted
-source-archive/Caddy commit pair from P0.3B.1 is not in this branch's P0.3B.2
-history, and source-archive files are not introduced by P0.3B.2. Existing
-Caddy/source-archive files visible in the tree are inherited from
-`origin/main`, not newly integrated.
+The branch contains current `origin/main` plus the P0.3B.2 integration commits.
+P0.2 and source-archive safety changes are inherited only through
+`origin/main`. The net PR diff remains limited to P0.3B.2 auth, Supabase,
+route, test, CI/test-environment, research, staging, and task documentation.
+No landing-page visual changes, Resend API sending, Inngest jobs, Pinecone
+ingestion/queries, PostHog capture, Sentry capture, hosted LLMs, notification
+outbox, product features, generated source archives, or real env files are
+introduced by P0.3B.2.
 
 ## CI and Test Environment Strategy
 
@@ -102,9 +88,7 @@ Caddy/source-archive files visible in the tree are inherited from
   precedence over placeholders.
 - `.env.test` contains only safe placeholders for `AUTH_SECRET` and
   `DATABASE_URL`; it is not a production runtime file.
-- No runtime, package script, or test setup uses `SKIP_ENV_VALIDATION`; remaining
-  textual references are documentation and assertions proving the bypass stays
-  out.
+- No runtime, package script, or test setup uses `SKIP_ENV_VALIDATION`.
 - Package scripts do not use shell `source` commands.
 
 ## Test Database Safety Design
@@ -116,16 +100,31 @@ Caddy/source-archive files visible in the tree are inherited from
 - `scripts/check-test-database-url.mjs` rejects missing required
   `TEST_DATABASE_URL`, production-like hostnames, ambiguous database names, and
   drift where `DATABASE_URL` differs from `TEST_DATABASE_URL`.
-- Local `npx prisma migrate status` may fail safely when no disposable local
-  test database exists.
+- Local database checks fail safely when `TEST_DATABASE_URL` is absent.
 - Production `DATABASE_URL` must never be used by tests.
+
+## Research Decision Log
+
+`docs/research/SHRI_AI_DECISION_LOG.md` is created and maintained as the
+provider/security decision log. It records Supabase SSR/Auth, staging rollout,
+and future notification architecture decisions with source organization, title,
+URL, date checked, rationale, validation evidence, and rollback trigger.
+
+## Manual Staging Checklist
+
+`docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md` contains the required human
+staging checklist. Items remain pending unless actual human evidence is
+supplied. This branch does not claim the staging rollout has been manually
+completed.
 
 ## P0.3C Block
 
-P0.3C remains blocked because manual staging evidence has not been supplied for
-the controlled Supabase Auth rollout checklist. No Resend API sending, Inngest
-jobs, Pinecone queries, PostHog capture, Sentry capture, hosted LLMs, or
-notification outbox work is included in P0.3B.2.
+P0.3C remains blocked until P0.3B.2 is merged, CI is reproducible without real
+env files, no test can use production `DATABASE_URL`, human Supabase staging
+evidence is complete, and no unresolved auth/session conflict findings remain.
+No Resend API sending, Inngest jobs, Pinecone ingestion/queries, PostHog
+capture, Sentry capture, hosted LLMs, or notification outbox work is included in
+P0.3B.2.
 
 ## Validation Evidence
 
@@ -133,20 +132,21 @@ notification outbox work is included in P0.3B.2.
 - `npm run format:check`: passed.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
+- `npm run test -- scripts/evaluate-scripture-retrieval.test.ts`: passed, 1
+  file / 1 test.
 - `npm run test`: passed, 54 files / 278 tests.
 - `npm run test:ci`: passed, 54 files / 278 tests.
 - `npm run build:ci`: passed.
 - `npm audit --audit-level=high`: passed with 1 low and 3 moderate advisories.
-- `npm run prisma:generate`: passed.
-- `npx prisma validate`: passed.
-- `git diff --check`: passed.
-- `git ls-files -- .env .env.local .env.production .env.development`: no
-  tracked real env files.
-- `rg -n "SKIP_ENV_VALIDATION" .`: only documentation and assertion references;
-  no runtime, package script, or setup bypass.
 - `npm run test:db:preflight` without `TEST_DATABASE_URL`: failed safely with
   the expected prerequisite message.
 - `TEST_DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public npm run test:db:preflight`:
   passed.
-- Final `git status --short`: pending documentation commit at time of this
-  update.
+- `git ls-files -- .env .env.local .env.production .env.development`: no
+  tracked real env files.
+- `rg -n "SKIP_ENV_VALIDATION" .`: only documentation and assertion references;
+  no runtime, package script, or setup bypass.
+- `git diff --check`: passed.
+- Final hosted CI evidence is pending until PR #4 is pushed and checks rerun.

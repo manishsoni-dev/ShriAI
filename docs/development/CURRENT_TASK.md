@@ -141,10 +141,16 @@ Database integration checks must run only with an explicit disposable
   branch.
 - Resolved the only merge conflict in this task ledger by restoring the active
   P0.3B.2 task state while inheriting current-main P0.2/source-archive changes.
+- Made the inherited scripture eval fail-fast regression test deterministic
+  under the full P0.3B.2 suite by adding an explicit child-process timeout and
+  Vitest timeout while preserving the `LOCAL_AI_UNAVAILABLE` and no-artifact
+  assertions.
 
 ### Files Changed
 
 - `docs/development/CURRENT_TASK.md`
+- `docs/development/P0_3B_2_INTEGRATION.md`
+- `scripts/evaluate-scripture-retrieval.test.ts`
 - Current-main inherited files from PR #5 and PR #6 are part of the merge
   history, not new P0.3B.2 scope.
 
@@ -156,15 +162,42 @@ Database integration checks must run only with an explicit disposable
 
 ### Tests Run
 
-- Pending after merge conflict resolution.
+- `npm run secrets:check`: passed.
+- `npm run format:check`: passed.
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
+- `npm run test -- scripts/evaluate-scripture-retrieval.test.ts`: passed, 1
+  file / 1 test.
+- `npm run test`: passed, 54 files / 278 tests.
+- `npm run test:ci`: passed, 54 files / 278 tests.
+- `npm run build:ci`: passed.
+- `npm audit --audit-level=high`: passed with 1 low and 3 moderate advisories.
+- `npm run test:db:preflight` without `TEST_DATABASE_URL`: failed safely with
+  the expected prerequisite message.
+- `TEST_DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public npm run test:db:preflight`:
+  passed.
+- `git ls-files -- .env .env.local .env.production .env.development`: no
+  tracked real env files.
+- `rg -n "SKIP_ENV_VALIDATION" .`: only documentation and assertion references;
+  no runtime, package script, or setup bypass.
+- `git diff --check`: passed.
 
 ### Checks Passed
 
 - Pre-merge worktree inspection passed.
+- Current-main merge completed with only the task-ledger conflict.
+- Required local validation passed.
+- Database preflight fails safely when no `TEST_DATABASE_URL` is provided and
+  accepts an explicit disposable matching test URL.
 
 ### Checks Failed
 
-- None yet after conflict resolution.
+- `npm run test` and `npm run test:ci` initially failed because
+  `scripts/evaluate-scripture-retrieval.test.ts` exceeded Vitest's default 5s
+  timeout after the current-main merge. The test now has explicit timeouts and
+  passes while preserving the same failure assertions.
 
 ### Remaining Blockers
 
