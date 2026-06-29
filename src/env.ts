@@ -1,6 +1,12 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
+const NEXT_PRODUCTION_BUILD_PHASE = "phase-production-build";
+const BUILD_TIME_AUTH_SECRET =
+  "build-time-placeholder-auth-secret-at-least-32-chars";
+const BUILD_TIME_DATABASE_URL =
+  "postgresql://build:build@localhost:5432/shri_ai_build?schema=public";
+
 export const env = createEnv({
   server: {
     OLLAMA_BASE_URL: loopbackUrl().default("http://127.0.0.1:11434"),
@@ -86,8 +92,14 @@ export const env = createEnv({
     STT_MODEL: process.env.STT_MODEL,
     STT_TIMEOUT_MS: process.env.STT_TIMEOUT_MS,
     STT_SERVICE_TOKEN: process.env.STT_SERVICE_TOKEN,
-    AUTH_SECRET: process.env.AUTH_SECRET,
-    DATABASE_URL: process.env.DATABASE_URL,
+    AUTH_SECRET: buildTimeOnlyPlaceholder(
+      process.env.AUTH_SECRET,
+      BUILD_TIME_AUTH_SECRET,
+    ),
+    DATABASE_URL: buildTimeOnlyPlaceholder(
+      process.env.DATABASE_URL,
+      BUILD_TIME_DATABASE_URL,
+    ),
     SUPABASE_SECRET_KEY: process.env.SUPABASE_SECRET_KEY,
     PINECONE_API_KEY: process.env.PINECONE_API_KEY,
     PINECONE_INDEX_NAME: process.env.PINECONE_INDEX_NAME,
@@ -126,6 +138,19 @@ export const env = createEnv({
   },
   emptyStringAsUndefined: true,
 });
+
+function buildTimeOnlyPlaceholder(
+  value: string | undefined,
+  placeholder: string,
+) {
+  if (value !== undefined && value !== "") {
+    return value;
+  }
+
+  return process.env.NEXT_PHASE === NEXT_PRODUCTION_BUILD_PHASE
+    ? placeholder
+    : undefined;
+}
 
 function loopbackUrl() {
   return z
