@@ -59,8 +59,16 @@ export const env = createEnv({
     ENABLE_BETA_INVITES: z.enum(["true", "false"]).default("true"),
     OLLAMA_MAX_CONCURRENCY: z.coerce.number().int().positive().default(2),
     WHISPER_MAX_CONCURRENCY: z.coerce.number().int().positive().default(1),
+    SUPABASE_AUTH_NEW_ACCOUNT_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    SUPABASE_AUTH_LINKED_SIGNIN_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    SUPABASE_AUTH_STAGING_ONLY: z.enum(["true", "false"]).default("false"),
   },
   client: {
+    NEXT_PUBLIC_SITE_URL: z.string().url().default("https://shri.local"),
     NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1).optional(),
     NEXT_PUBLIC_POSTHOG_KEY: z.string().min(1).optional(),
@@ -103,6 +111,12 @@ export const env = createEnv({
     ENABLE_BETA_INVITES: process.env.ENABLE_BETA_INVITES,
     OLLAMA_MAX_CONCURRENCY: process.env.OLLAMA_MAX_CONCURRENCY,
     WHISPER_MAX_CONCURRENCY: process.env.WHISPER_MAX_CONCURRENCY,
+    SUPABASE_AUTH_NEW_ACCOUNT_ENABLED:
+      process.env.SUPABASE_AUTH_NEW_ACCOUNT_ENABLED,
+    SUPABASE_AUTH_LINKED_SIGNIN_ENABLED:
+      process.env.SUPABASE_AUTH_LINKED_SIGNIN_ENABLED,
+    SUPABASE_AUTH_STAGING_ONLY: process.env.SUPABASE_AUTH_STAGING_ONLY,
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL,
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,

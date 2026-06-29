@@ -22,11 +22,11 @@ export class DuplicateEmailError extends Error {
   }
 }
 
-function normalizeEmail(email: string) {
+export function normalizeEmail(email: string) {
   return email.toLowerCase().trim();
 }
 
-function normalizeName(name: string | undefined) {
+export function normalizeName(name: string | undefined) {
   return name ? name.trim().slice(0, 100) || null : null;
 }
 
@@ -37,7 +37,7 @@ export class BetaAccessDeniedError extends Error {
   }
 }
 
-async function verifyBetaAccess(email: string) {
+export async function verifyBetaAccess(email: string) {
   const betaEnabled = await getFeatureFlag("beta_invites");
   if (betaEnabled || env.RELEASE_ENVIRONMENT === "staging") {
     // Legacy static allowlist fallback

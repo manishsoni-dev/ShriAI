@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { createDocument, deleteDocument } from "@/lib/documents";
 import { db } from "@/lib/db";
 import { ingestDocument } from "@/lib/ingestion/ingest-document";

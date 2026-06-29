@@ -1,9 +1,7 @@
 "use server";
 
-import { signOut } from "@/auth";
+import { unifiedLogout } from "@/app/actions/logout";
 
 export async function signOutAction() {
-  await signOut({
-    redirectTo: "/",
-  });
+  await unifiedLogout();
 }

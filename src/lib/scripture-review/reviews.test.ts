@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ── Auth mock — default: valid reviewer session ───────────────────────────────
-vi.mock("@/auth", () => ({
-  auth: vi.fn().mockResolvedValue({ user: { id: "reviewer-user" } }),
+vi.mock("@/lib/auth/get-authenticated-user", () => ({
+  getAuthenticatedUser: vi
+    .fn()
+    .mockResolvedValue({ user: { id: "reviewer-user" } }),
 }));
 
 // ── DB mock fixtures ─────────────────────────────────────────────────────────
@@ -30,7 +32,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { db } from "@/lib/db";
 import {
   mutateScriptureReview,

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { createConversation } from "@/lib/conversations";
 import { db } from "@/lib/db";
 import { getPersona } from "@/lib/personas";

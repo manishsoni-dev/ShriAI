@@ -1,85 +1,114 @@
-# Current Task: Source Archive Safety Correction
+# Current Task: P0.3B.2 - Integration Recovery and Staging Certification
 
 ## Objective
 
-Fix the safe source archive gate after P0.1 and P0.2 were merged. The archive
-creator must generate a ZIP from a clean committed tree that passes the archive
-verifier and excludes `.env*`, `.git`, `node_modules`, `.next`, logs,
-databases, uploads, test outputs, and eval artifacts.
+Integrate the controlled Supabase Auth staging work from P0.3B/P0.3B.1 onto
+current `origin/main`, add deterministic CI/test environment controls and test
+database safety, maintain the research decision log, and document staging
+certification without starting P0.3C.
 
 ## Verified Current Flow
 
-- Worktree: `/Users/manishh/Desktop/ShriAI-p0-baseline`.
-- Branch before correction: `main` fast-forwarded to `origin/main` at
-  `4b70857 Merge pull request #5 from
-manishsoni-dev/codex/p0-2-managed-services-foundation-clean`.
-- Correction branch: `codex/source-archive-safety-correction`.
-- Worktree was clean before branch creation.
-- `npm run source:archive` from clean merged `main` failed because the
-  generated ZIP contained verifier-prohibited tracked files:
-  - `.env.example`
-  - `data/evals/**`
-- The verifier already denies the relevant unsafe archive paths; the creator
-  was not passing matching Git archive exclusions before writing the ZIP.
+- Worktree: `/Users/manishh/Desktop/Shri AI P0.3B.2`.
+- Branch: `codex/p0-3b-2-integration-staging-certification`.
+- Current `origin/main`: `68c521a Merge pull request #6 from
+manishsoni-dev/codex/source-archive-safety-correction`.
+- Branch head before the latest main merge:
+  `ea723cd docs: record p0.3b.2 stale main state`.
+- Previous branch head before this continuation:
+  `fbf987f docs: refresh p0.3b.2 certification topology`.
+- Merge base with current `origin/main` before this continuation: `cbade94`.
+- Worktree state before this continuation: `git status --short` clean.
+- `git diff --stat` and `git diff` before this continuation had no output.
+- PR #4 is the active P0.3B.2 PR. Its prior checks were green, but stale after
+  PR #5 and PR #6 moved `origin/main`.
+- `git diff --name-status origin/main...HEAD` before the latest main merge was
+  limited to P0.3B.2 auth, Supabase, route, test, CI/test-environment, and
+  documentation files.
+- The latest merge from `origin/main` conflicted only in this task ledger. The
+  conflict was caused by current-main source-archive task bookkeeping, not by
+  runtime code.
 
 ## Scope
 
-- Update `scripts/create-source-archive.mjs` so `git archive` excludes paths
-  prohibited by the source archive verifier.
-- Keep the verifier's denylist intact.
-- Add regression coverage proving the creator contains explicit exclusions for
-  env placeholders, eval artifacts, uploads, build outputs, and test outputs.
-- Generate and verify a fresh archive only after this correction is committed.
+- Integrate reviewed P0.3A/P0.3B.1 Supabase Auth staging changes.
+- Add deterministic `test:ci` and `build:ci` scripts using tracked safe
+  `.env.test` placeholders.
+- Add `TEST_DATABASE_URL` safety rules that reject production-like database
+  targets and DATABASE_URL drift.
+- Maintain `docs/research/SHRI_AI_DECISION_LOG.md`.
+- Maintain `docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md` without marking
+  manual staging items complete without evidence.
+- Update P0.3B.2 docs and PR #4 after merging current `origin/main`.
 
 ## Out-Of-Scope Work
 
-- Do not change product runtime behavior.
-- Do not activate Supabase Auth, Resend, Inngest, Pinecone, PostHog, Sentry, or
-  hosted LLMs.
-- Do not commit generated ZIP archives.
-- Do not read, copy, print, or commit real `.env` or `.env.local`.
-- Do not start P0.3A until all clean-integration gates are verified.
-- Do not use Replit unless a concrete import/deploy/environment task is added.
+- No P0.3C.
+- No landing-page visual work.
+- No Resend API email sending, Inngest jobs, Pinecone ingestion/queries,
+  PostHog capture, Sentry capture, hosted LLMs, or product features.
+- No real `.env`, `.env.local`, `.env.production`, or `.env.development` files.
+- No mutation or deletion of sibling worktrees.
+- No history rewriting or force-push.
+- Do not use Replit unless a concrete Replit app import, deploy, or update task
+  is provided.
 
 ## Decisions
 
-- Use Git pathspec exclusions in the archive creator rather than weakening the
-  verifier.
-- Keep `.env.example` out of source archives because the gate requires `.env*`
-  exclusion.
-- Add a CLI guard to `scripts/create-source-archive.mjs` so future imports do
-  not create archives as a side effect.
+- Keep PR #4 as the active P0.3B.2 integration vehicle and refresh it with a
+  normal merge from current `origin/main`.
+- Preserve current-main P0.2 and source-archive safety work as inherited main
+  history, not as new P0.3B.2 scope.
+- Keep production runtime env validation strict; use explicit `.env.test`
+  placeholder loading only for `test:ci` and `build:ci`.
+- Require explicit disposable `TEST_DATABASE_URL` for database integration
+  checks.
 
 ## Acceptance Criteria
 
-- `npm run source:archive` passes from a clean committed tree.
-- `npm run source:archive:verify -- <archive>` passes for the generated ZIP.
-- The generated ZIP is not tracked.
-- Required validation checks pass.
-- Branch is merged before treating the source archive gate as complete.
+- Branch contains current `origin/main` without rebase or force-push.
+- Net branch diff remains limited to P0.3B.2 auth, Supabase, CI/test env,
+  database-safety, research, staging-certification, and task documentation.
+- No runtime, package script, or test setup uses `SKIP_ENV_VALIDATION`.
+- `.env.test` contains only safe placeholders required by `src/env.ts`.
+- `npm run test:ci` and `npm run build:ci` load `.env.test` without overriding
+  real CI-provided environment variables.
+- `TEST_DATABASE_URL` checks fail safely when absent or production-like.
+- PR #4 hosted CI passes after current-main refresh.
+- Human Supabase staging checklist remains pending unless actual evidence is
+  supplied.
 
 ## Files Expected To Change
 
+- `.env.test`
+- `.github/workflows/ci.yml`
+- `.gitignore`
 - `docs/development/CURRENT_TASK.md`
-- `scripts/create-source-archive.mjs`
-- `tests/release-integrity.test.ts`
+- `docs/development/P0_3B_2_INTEGRATION.md`
+- `docs/development/P0_3B_CERTIFICATION.md`
+- `docs/research/SHRI_AI_DECISION_LOG.md`
+- `docs/security/SUPABASE_AUTH_MIGRATION.md`
+- `docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md`
+- `package.json`
+- `scripts/run-with-test-env.mjs`
+- `scripts/check-test-database-url.mjs`
+- P0.3B/P0.3B.1 auth, Supabase, route, and tests.
 
 ## Files That Must Remain Unchanged
 
 - Real `.env`, `.env.local`, `.env.production`, and `.env.development` files.
+- P0.1/P0.2/P0.3A/P0.3B.1/source-archive sibling worktrees.
 - Runtime artifacts, generated archives, logs, uploads, databases,
   `node_modules`, and `.next`.
 
 ## Tests Required
 
-- `npm run secrets:check`
-- `npm run format:check`
-- `npm run lint`
-- Targeted release integrity tests.
-- `npm run source:archive`
-- `npm run source:archive:verify -- <archive>`
-- `git diff --check`
-- `git status --short`
+- Auth arbitration and route certification tests.
+- Client/server Supabase boundary tests.
+- CI env placeholder loading tests.
+- Test database safety preflight tests.
+- Research/staging docs review for pending human evidence.
+- Full required validation command set.
 
 ## Verification Commands
 
@@ -87,69 +116,96 @@ manishsoni-dev/codex/p0-2-managed-services-foundation-clean`.
 npm run secrets:check
 npm run format:check
 npm run lint
-npm run test -- tests/release-integrity.test.ts src/lib/source-archive.test.mjs
-npm run source:archive
-npm run source:archive:verify -- dist/source-archives/<archive>.zip
+npm run typecheck
+npm run test
+npm run test:ci
+npm run build:ci
+npm audit --audit-level=high
+npm run prisma:generate
+npx prisma validate
+npm run test:db:preflight
 git diff --check
 git status --short
 ```
+
+Database integration checks must run only with an explicit disposable
+`TEST_DATABASE_URL`; the no-`TEST_DATABASE_URL` preflight must fail safely.
 
 ## Implementation Log
 
 ### What Was Implemented
 
-- Added explicit `git archive` exclusion pathspecs to the archive creator.
-- Added a CLI guard to prevent archive creation when the script is imported.
-- Added release-integrity assertions for source archive exclusions.
+- Verified PR #4 was open and previously green but stale after P0.2 and
+  source-archive safety merged into `origin/main`.
+- Started a normal merge of current `origin/main` into the existing P0.3B.2
+  branch.
+- Resolved the only merge conflict in this task ledger by restoring the active
+  P0.3B.2 task state while inheriting current-main P0.2/source-archive changes.
+- Made the inherited scripture eval fail-fast regression test deterministic
+  under the full P0.3B.2 suite by adding an explicit child-process timeout and
+  Vitest timeout while preserving the `LOCAL_AI_UNAVAILABLE` and no-artifact
+  assertions.
 
 ### Files Changed
 
 - `docs/development/CURRENT_TASK.md`
-- `scripts/create-source-archive.mjs`
-- `tests/release-integrity.test.ts`
+- `docs/development/P0_3B_2_INTEGRATION.md`
+- `scripts/evaluate-scripture-retrieval.test.ts`
+- Current-main inherited files from PR #5 and PR #6 are part of the merge
+  history, not new P0.3B.2 scope.
 
 ### Decisions Made
 
-- Preserve the stricter verifier and fix creation instead of allowing
-  `.env.example` or eval artifacts into generated ZIPs.
+- Continue PR #4 instead of opening a duplicate P0.3B.2 PR.
+- Keep the manual Supabase staging checklist pending until human evidence is
+  provided.
 
 ### Tests Run
 
 - `npm run secrets:check`: passed.
-- `npm run format:check`: initially failed on this task ledger, then passed
-  after formatting.
+- `npm run format:check`: passed.
 - `npm run lint`: passed.
-- `npm run test -- tests/release-integrity.test.ts src/lib/source-archive.test.mjs`:
-  passed, 2 files / 9 tests.
 - `npm run typecheck`: passed.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
+- `npm run test -- scripts/evaluate-scripture-retrieval.test.ts`: passed, 1
+  file / 1 test.
+- `npm run test`: passed, 54 files / 278 tests.
+- `npm run test:ci`: passed, 54 files / 278 tests.
+- `npm run build:ci`: passed.
+- `npm audit --audit-level=high`: passed with 1 low and 3 moderate advisories.
+- `npm run test:db:preflight` without `TEST_DATABASE_URL`: failed safely with
+  the expected prerequisite message.
+- `TEST_DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public npm run test:db:preflight`:
+  passed.
+- `git ls-files -- .env .env.local .env.production .env.development`: no
+  tracked real env files.
+- `rg -n "SKIP_ENV_VALIDATION" .`: only documentation and assertion references;
+  no runtime, package script, or setup bypass.
 - `git diff --check`: passed.
-- `npm run source:archive`: passed from clean committed branch
-  `2033a24`, creating `dist/source-archives/shri-ai-source-2033a24.zip`.
-- `npm run source:archive:verify -- dist/source-archives/shri-ai-source-2033a24.zip`:
-  passed, 401 entries.
 
 ### Checks Passed
 
-- Initial failure reproduced from clean merged `main`.
-- Archive creator now has explicit Git pathspec exclusions matching the unsafe
-  archive classes covered by the verifier.
-- Targeted release/source-archive tests pass.
-- The corrected archive creator successfully generated and verified a ZIP from
-  a clean committed branch tree.
+- Pre-merge worktree inspection passed.
+- Current-main merge completed with only the task-ledger conflict.
+- Required local validation passed.
+- Database preflight fails safely when no `TEST_DATABASE_URL` is provided and
+  accepts an explicit disposable matching test URL.
 
 ### Checks Failed
 
-- `npm run source:archive` failed before the fix because the archive contained
-  `.env.example` and `data/evals/**`.
+- `npm run test` and `npm run test:ci` initially failed because
+  `scripts/evaluate-scripture-retrieval.test.ts` exceeded Vitest's default 5s
+  timeout after the current-main merge. The test now has explicit timeouts and
+  passes while preserving the same failure assertions.
 
 ### Remaining Blockers
 
-- Correction needs push, hosted CI, merge, and then a fresh archive generated
-  from corrected `main`.
-- Manual external secret rotation and old shared ZIP removal remain
-  maintainer-owned.
+- PR #4 needs validation, push, hosted CI, and merge.
+- Human Supabase staging checklist evidence is still not supplied.
+- P0.3C remains blocked.
 
 ### Recommended Next Task
 
-- Validate, commit, and merge the archive-safety correction, then regenerate
-  the archive from clean `main`.
+- Complete the merge, rerun validation, push PR #4, wait for hosted CI, and
+  merge P0.3B.2 only if the refreshed checks pass.

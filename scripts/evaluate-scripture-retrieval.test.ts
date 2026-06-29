@@ -46,6 +46,7 @@ describe("evaluate-scripture-retrieval local AI failure handling", () => {
             SCRIPTURE_EVAL_CASE_TIMEOUT_MS: "25",
           },
           stdio: ["ignore", "pipe", "pipe"],
+          timeout: 10_000,
         },
       );
     } catch (error) {
@@ -58,5 +59,5 @@ describe("evaluate-scripture-retrieval local AI failure handling", () => {
     expect(output).toContain("LOCAL_AI_UNAVAILABLE");
     const after = new Set(readdirSync("data/evals/scripture-retrieval/runs"));
     expect(after).toEqual(before);
-  });
+  }, 15_000);
 });
