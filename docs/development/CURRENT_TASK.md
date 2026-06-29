@@ -2,37 +2,46 @@
 
 ## Objective
 
-Create a fresh isolated P0.3B.2 branch from `origin/main`, integrate only the
-controlled Supabase Auth staging work from P0.3B/P0.3B.1, add deterministic
-CI/test environment commands and test database safety, and document staging
+Use the isolated P0.3B.2 branch/worktree to integrate only the controlled
+Supabase Auth staging work from P0.3B/P0.3B.1, add deterministic CI/test
+environment commands and test database safety, and document staging
 certification without starting P0.3C.
 
 ## Verified Current Flow
 
-- Fresh worktree: `/Users/manishh/Desktop/Shri AI P0.3B.2`.
+- Isolated worktree: `/Users/manishh/Desktop/Shri AI P0.3B.2`.
 - Branch: `codex/p0-3b-2-integration-staging-certification`.
-- Branch base: `origin/main` at `4786bbd`.
-- Initial worktree state: `git status --short` clean.
-- Initial branch log starts at `4786bbd Merge branch 'codex/p0-baseline-verify' into main`.
-- Initial diff: `git diff --stat` and `git diff` have no output.
+- Current `origin/main`: `cbade94 Merge P0.1 release integrity hardening`.
+- Current branch head after bringing in current main:
+  `e60c23b Merge origin/main into P0.3B.2 certification`.
+- Current merge base with `origin/main`: `cbade94`.
+- Current worktree state before documentation refresh: `git status --short`
+  clean.
+- Current P0.3B.2 commits ahead of `origin/main`:
+  `e60c23b Merge origin/main into P0.3B.2 certification` and
+  `b713baf feat: certify p0.3b integration recovery`.
+- Current `origin/main...HEAD` diff is limited to P0.3B.2 auth, Supabase,
+  route, test, CI/test-environment, and documentation files.
 - Preflight from the original P0.3B.1 worktree verified:
   - `git fetch origin --prune`: passed.
-  - `git worktree list`: existing worktrees are Shri AI P0.3B.1, P0.1 Clean,
-    P0.2 Clean, P0.3A, and baseline main.
+  - `git worktree list`: recorded P0.3B.1, P0.1 Clean, P0.2 Clean, P0.3A,
+    P0.3B.2, and baseline worktrees.
   - `git branch -a --contains 23dd098`: only local/remote
     `codex/p0-3b-1-auth-certification`.
   - `git cat-file -e 23dd098^{commit}`: passed.
-  - `git merge-base origin/main 23dd098`: `4786bbd`.
   - `git log --oneline origin/main..23dd098`: P0.3A, P0.3B.1, plus an
     out-of-scope source-archive commit and its revert.
   - `git diff --name-status origin/main...23dd098`: P0.3 auth/staging files
     only in net diff; no source-archive files remain in the net diff.
   - `git show --stat 23dd098`: five-file certification test/doc delta.
   - Original P0.3B.1 worktree `git status --short`: clean.
-- Interrupted P0.1 worktree preservation status:
-  `/Users/manishh/Desktop/Shri AI P0.1 Clean` has staged
-  `docs/development/CURRENT_TASK.md` after a rebase continuation. It is
-  unrelated to P0.3B.2 and will not be modified by this task.
+- Sibling worktrees checked after current-main merge:
+  P0.1 Clean, P0.2 Clean, P0.3A, and baseline worktrees are clean and were not
+  modified by this task.
+- PR state from GitHub:
+  PR #4 is the active P0.3B.2 draft PR and was clean with passing CI and
+  ArchGuard before the current-main merge; checks must rerun after push.
+  PR #3 is superseded by P0.3B.2. PR #1 is unrelated and merge-dirty.
 
 ## Scope
 
@@ -43,6 +52,7 @@ certification without starting P0.3C.
 - Test database safety preflight and documentation.
 - P0.3B.2 integration report, research decision log, and staging checklist.
 - GitHub Actions updates for deterministic CI commands.
+- Refresh P0.3B.2 docs after merging current `origin/main` into the branch.
 
 ## Out-Of-Scope Work
 
@@ -51,24 +61,28 @@ certification without starting P0.3C.
   Sentry capture, hosted LLMs, or product features.
 - No unrelated P0.1 rebase, source archive, Caddy, UI, cosmic, or script WIP
   unless already present in `origin/main`.
-- No mutation or deletion of the original or interrupted worktrees.
+- No mutation or deletion of sibling worktrees.
 - No history rewriting or force-push.
 - No copying, reading, printing, or committing real `.env` or `.env.local`.
 
 ## Decisions
 
-- Use the fresh worktree as the only implementation location.
+- Use the isolated P0.3B.2 worktree as the only implementation location.
 - Treat current Git state and GitHub state as authoritative.
-- Inspect net P0.3B.1 diff and ancestry before applying any code.
+- Bring current `origin/main` into the existing P0.3B.2 branch with a normal
+  merge commit because the branch/PR already existed; do not rebase or
+  force-push.
 - Keep `npm run build` as the production build command requiring real
   configuration; add explicit CI/test commands for placeholder-based validation.
 - Do not silently create local PostgreSQL roles or databases.
 
 ## Acceptance Criteria
 
-- Branch is created from current `origin/main`.
+- Branch contains current `origin/main` without history rewriting or force-push.
 - Integrated diff excludes the out-of-scope source archive/Caddy rebase work.
-- `SKIP_ENV_VALIDATION` is absent.
+- No runtime, package script, or test setup uses `SKIP_ENV_VALIDATION`; remaining
+  textual references are documentation and assertions proving the bypass stays
+  out.
 - `.env.test` contains only safe placeholders required by `src/env.ts`.
 - `npm run test:ci` and `npm run build:ci` load `.env.test` placeholders without
   overriding existing CI-provided environment variables.
@@ -93,7 +107,7 @@ certification without starting P0.3C.
 ## Files That Must Remain Unchanged
 
 - Real `.env`, `.env.local`, `.env.production`, and `.env.development` files.
-- Interrupted P0.1/P0.2/P0.3A worktrees outside this fresh P0.3B.2 worktree.
+- P0.1/P0.2/P0.3A/baseline worktrees outside this isolated P0.3B.2 worktree.
 - Source archive, Caddy, UI/cosmic, generated runtime, upload, log, database, or
   build artifacts unless already in `origin/main`.
 
@@ -130,8 +144,11 @@ Database integration checks must run only with an explicit disposable
 
 ### What Was Implemented
 
-- Created the fresh isolated P0.3B.2 worktree and branch from `origin/main`.
-- Recorded mandatory preflight evidence and task scope.
+- Used the isolated P0.3B.2 worktree and branch; it already existed before this
+  turn and was verified before further work.
+- Merged current `origin/main` (`cbade94`) into P0.3B.2 with a normal merge
+  commit, avoiding rebase/force-push/history rewriting.
+- Recorded mandatory preflight evidence and refreshed the task scope.
 - Integrated the net P0.3A/P0.3B.1 controlled Supabase Auth staging diff while
   excluding the old task-document churn and the reverted source-archive history.
 - Added deterministic `test:ci` and `build:ci` commands using `.env.test`
@@ -157,8 +174,8 @@ Database integration checks must run only with an explicit disposable
 
 ### Decisions Made
 
-- Leave the interrupted P0.1 clean worktree untouched and document it as
-  unrelated preserved worktree state.
+- Leave sibling P0.1/P0.2/P0.3A/baseline worktrees untouched and document their
+  clean state.
 - Keep `npm run build` as the production build command; use `build:ci` only for
   placeholder-backed validation.
 - Require `TEST_DATABASE_URL` for database integration checks and reject
@@ -173,18 +190,25 @@ Database integration checks must run only with an explicit disposable
 - `npm run test`: passed, 54 files / 278 tests.
 - `npm run test:ci`: passed, 54 files / 278 tests.
 - `npm run build:ci`: passed.
-- `npm audit --audit-level=high`: passed with low/moderate advisories only.
+- `npm audit --audit-level=high`: passed with 1 low and 3 moderate advisories.
 - `npm run prisma:generate`: passed.
 - `npx prisma validate`: passed.
+- `npm run test:db:preflight` without `TEST_DATABASE_URL`: failed safely with
+  the expected prerequisite message.
+- `TEST_DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public npm run test:db:preflight`:
+  passed.
+- `git ls-files -- .env .env.local .env.production .env.development`: no
+  tracked real env files.
+- `rg -n "SKIP_ENV_VALIDATION" .`: only documentation and assertion references;
+  no runtime, package script, or setup bypass.
 - `git diff --check`: passed.
-- `npm run test:db:preflight`: failed safely without `TEST_DATABASE_URL`.
-- Explicit disposable `TEST_DATABASE_URL` preflight: passed.
 
 ### Checks Passed
 
-- Fresh worktree creation and initial Git inspection passed.
-- Required local validation passed, except for the intentionally missing
-  `TEST_DATABASE_URL` prerequisite check.
+- Current-main merge completed cleanly.
+- Required validation commands passed.
+- Database preflight fails safely when `TEST_DATABASE_URL` is absent and accepts
+  a clearly disposable matching test URL.
 
 ### Checks Failed
 
@@ -202,5 +226,5 @@ Database integration checks must run only with an explicit disposable
 
 ### Recommended Next Task
 
-- Inspect and integrate the P0.3B/P0.3B.1 net auth diff onto this branch,
-  excluding unrelated history.
+- Complete validation, push PR #4, and wait for CI/ArchGuard before any P0.3C
+  work.
