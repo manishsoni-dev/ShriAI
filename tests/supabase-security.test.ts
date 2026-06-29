@@ -33,6 +33,30 @@ function readSrc(rel: string): string {
   return readFileSync(path.join(process.cwd(), rel), "utf8");
 }
 
+const migratedProtectedSurfaces = [
+  "src/app/api/chat/stream/route.ts",
+  "src/app/api/events/route.ts",
+  "src/app/api/voice/transcribe/route.ts",
+  "src/app/chat/actions.ts",
+  "src/app/chat/page.tsx",
+  "src/app/dashboard/page.tsx",
+  "src/app/knowledge/actions.ts",
+  "src/app/knowledge/page.tsx",
+  "src/app/knowledge/search/page.tsx",
+  "src/app/sign-in/page.tsx",
+  "src/lib/auth/session.ts",
+  "src/lib/scripture-review/reviews.ts",
+];
+
+const authJsAllowedFiles = [
+  "src/auth.ts",
+  "src/proxy.ts",
+  "src/app/actions/logout.ts",
+  "src/app/api/auth/[...nextauth]/route.ts",
+  "src/app/sign-in/actions.ts",
+  "src/lib/auth/get-authenticated-user.ts",
+];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. SECRET KEY ABSENT FROM BROWSER BUNDLES
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,6 +186,86 @@ describe("Auth.js remains the production auth path", () => {
       expect(src).not.toContain("getCurrentActor");
       expect(src).not.toContain("current-actor");
     }
+  });
+});
+
+describe("P0.3B.1 route cutover certification", () => {
+  it("keeps every migrated protected surface on getAuthenticatedUser", () => {
+    const violations: string[] = [];
+
+    for (const file of migratedProtectedSurfaces) {
+      const src = readSrc(file);
+      if (!src.includes("@/lib/auth/get-authenticated-user")) {
+        violations.push(`${file} does not import getAuthenticatedUser`);
+      }
+      if (src.includes('from "@/auth"') || src.includes("from '@/auth'")) {
+        violations.push(`${file} imports Auth.js directly`);
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("limits direct Auth.js imports to owned auth boundary files", () => {
+    const violations: string[] = [];
+
+    for (const file of sourceFiles()) {
+      if (file.includes(".test.")) continue;
+      const src = readSrc(file);
+      if (!src.includes("@/auth")) continue;
+      if (authJsAllowedFiles.includes(file)) continue;
+      violations.push(file);
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("documents absent saved/settings route surfaces instead of silently omitting them", () => {
+    const appFiles = sourceFiles("src/app");
+    expect(appFiles.some((file) => file.startsWith("src/app/saved/"))).toBe(
+      false,
+    );
+    expect(appFiles.some((file) => file.startsWith("src/app/settings/"))).toBe(
+      false,
+    );
+
+    const certification = readSrc("docs/development/P0_3B_CERTIFICATION.md");
+    expect(certification).toContain("| saved answers");
+    expect(certification).toContain("| settings");
+    expect(certification).toContain("no route present in this branch");
+  });
+
+  it("keeps active sign-in and signup paths free of dormant providers", () => {
+    const files = [
+      "src/app/sign-in/actions.ts",
+      "src/app/sign-in/page.tsx",
+      "src/app/sign-in/sign-in-form.tsx",
+      "src/app/api/auth/supabase/callback/route.ts",
+    ];
+    const forbidden = [
+      "resend",
+      "inngest",
+      "pinecone",
+      "posthog",
+      "sentry",
+      "RESEND_API_KEY",
+      "INNGEST_EVENT_KEY",
+      "PINECONE_API_KEY",
+      "NEXT_PUBLIC_POSTHOG_KEY",
+      "SENTRY_AUTH_TOKEN",
+    ];
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const src = readSrc(file).toLowerCase();
+      for (const pattern of forbidden) {
+        if (src.includes(pattern.toLowerCase())) {
+          violations.push(`${file} references ${pattern}`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
   });
 });
 

@@ -108,8 +108,12 @@ describe("Supabase auth callback", () => {
     });
 
     const response = await GET(callbackRequest());
+    const location = response.headers.get("location") ?? "";
 
     expect(locationPath(response)).toBe("/sign-in");
+    expect(location).not.toContain("expired");
+    expect(location).not.toContain("new@example.com");
+    expect(location).not.toContain(confirmedUser.id);
     expect(mocks.signOut).toHaveBeenCalledOnce();
     expect(mocks.transaction).not.toHaveBeenCalled();
   });

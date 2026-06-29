@@ -10,6 +10,8 @@ without starting P0.3C or activating dormant managed services.
 ## Verified Current Flow
 
 - Branch is `codex/p0-3b-1-auth-certification`.
+- Out-of-scope archive/Caddy commit `2b88e69` was reverted with `cf8c082`,
+  returning this branch to P0.3B.1 auth-certification scope.
 - `tests/setup.ts` now loads `.env.test` through `dotenv`; it does not set a
   global environment-validation bypass.
 - `.env.test` contains only safe placeholders required by `src/env.ts`:
@@ -22,6 +24,9 @@ without starting P0.3C or activating dormant managed services.
   - linked Supabase identity wins when it matches the legacy session.
 - Protected product surfaces now import `getAuthenticatedUser as auth` instead
   of importing Auth.js directly.
+- Actual route inventory confirms there are no `saved` or `settings` routes in
+  this branch; certification docs record those requested surfaces as not
+  present rather than inventing coverage.
 - `npm run build` without any environment still fails strict validation because
   production builds do not load `.env.test`; exporting the same safe
   placeholders from `.env.test` makes the build pass.
@@ -133,6 +138,9 @@ npm run build
 npm audit --audit-level=high
 npm run prisma:generate
 npx prisma validate
+npx prisma migrate status
+git diff --check
+git status --short
 ```
 
 ## Implementation Log
@@ -154,6 +162,14 @@ npx prisma validate
   sign-out failure behavior.
 - Added security tests proving dormant Resend, Inngest, Pinecone, PostHog, and
   Sentry provider runtimes are not activated by active auth cutover files.
+- Added product-events route tests covering anonymous landing-page events,
+  denial for protected events without a resolved user, and ignoring
+  browser-supplied user identifiers.
+- Added static route-cutover certification tests proving migrated protected
+  surfaces import `getAuthenticatedUser`, direct Auth.js imports are limited to
+  owned auth boundary files, and absent saved/settings routes are documented.
+- Updated `docs/development/P0_3B_CERTIFICATION.md` with a route coverage
+  matrix and remaining staging checks.
 
 ### Files Changed
 
@@ -170,10 +186,12 @@ npx prisma validate
 
 - `npm run test -- src/lib/auth/current-actor.test.ts tests/lib/auth/get-authenticated-user.test.ts src/app/actions/logout.test.ts src/app/api/auth/supabase/callback/route.test.ts tests/supabase-security.test.ts src/lib/providers/providers.test.ts`:
   passed, 6 files / 53 tests.
+- `npm run test -- src/app/api/events/route.test.ts src/app/api/auth/supabase/callback/route.test.ts tests/supabase-security.test.ts tests/lib/auth/get-authenticated-user.test.ts src/lib/auth/current-actor.test.ts`:
+  passed, 5 files / 53 tests.
 - `npm run format:check`: passed.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
-- `npm run test`: passed, 51 files / 263 tests.
+- `npm run test`: passed, 52 files / 270 tests.
 - `npm audit --audit-level=high`: passed; low/moderate advisories remain.
 - `npm run secrets:check`: passed.
 - `npm run prisma:generate`: passed.
@@ -193,8 +211,9 @@ npx prisma validate
 - `npm run build` without any environment failed because strict env validation
   requires `AUTH_SECRET` and `DATABASE_URL`; `.env.test` is not loaded by Next
   production builds.
-- `npx prisma migrate status` with `.env.test` failed because no local Postgres
-  test database is serving at `localhost:5432`.
+- `set -a; source .env.test; set +a; npx prisma migrate status` failed with
+  `Error: Schema engine error:` because no local Postgres test database is
+  serving at `localhost:5432`.
 
 ### Remaining Blockers
 

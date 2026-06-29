@@ -34,6 +34,26 @@ Routes and actions now using `getAuthenticatedUser()`:
 - `src/lib/auth/session.ts`
 - `src/lib/scripture-review/reviews.ts`
 
+Protected surfaces covered by that route set:
+
+| Surface                    | Current route/action                                                           | Authorization evidence                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| chat page                  | `src/app/chat/page.tsx`                                                        | redirects when unauthenticated; uses current user for workspace/conversation lookups               |
+| chat stream                | `src/app/api/chat/stream/route.ts`                                             | 401 without session; ignores client-supplied user/workspace; cross-user conversation access denied |
+| chat actions               | `src/app/chat/actions.ts`                                                      | uses server-resolved user and ownership checks before mutation                                     |
+| dashboard                  | `src/app/dashboard/page.tsx`                                                   | redirects without session; reviewer link is derived from server-side allowlists                    |
+| knowledge upload           | `src/app/knowledge/actions.ts`                                                 | uses server-resolved user/workspace for upload/delete                                              |
+| knowledge listing          | `src/app/knowledge/page.tsx`                                                   | redirects without session; lists only server-resolved workspace                                    |
+| knowledge search           | `src/app/knowledge/search/page.tsx`                                            | redirects without session; searches only server-resolved workspace                                 |
+| voice transcription        | `src/app/api/voice/transcribe/route.ts`                                        | 401 without session; consent lookup and rate-limit keys use server-resolved user                   |
+| events                     | `src/app/api/events/route.ts`                                                  | anonymous access allowed only for `landing_page_viewed`; protected events use server-resolved user |
+| telemetry/admin pages      | `src/app/admin/telemetry/page.tsx`, `src/app/admin/scripture-reviews/page.tsx` | both use reviewer principal derived from authenticated DB user email and server-side allowlists    |
+| scripture review mutations | `src/lib/scripture-review/reviews.ts`                                          | requires reviewer/admin principal; browser-controlled role values are ignored                      |
+| admin Voice QA API         | `src/app/api/admin/voice-qa/route.ts`                                          | requires reviewer helper and `admin` role before mutation                                          |
+| onboarding                 | `src/app/onboarding/page.tsx`, `src/app/onboarding/actions.ts`                 | protected by `requireUser()`, which resolves through `getAuthenticatedUser()`                      |
+| saved answers              | no route present in this branch                                                | no current production surface to migrate or test                                                   |
+| settings                   | no route present in this branch                                                | no current production surface to migrate or test                                                   |
+
 Auth.js is still used directly only for owned auth boundaries:
 
 - `src/auth.ts`
@@ -59,6 +79,11 @@ Automated coverage now verifies:
 - repeated callback for an already linked Supabase subject is idempotent;
 - logout attempts to clear both Supabase and Auth.js sessions and still clears
   Auth.js if Supabase sign-out fails.
+- no migrated protected surface imports Auth.js directly;
+- direct Auth.js imports are limited to owned auth boundary files;
+- anonymous product events are limited to landing-page telemetry;
+- browser-supplied user identifiers are ignored for protected events and chat;
+- saved answers and settings are explicitly documented as absent routes.
 
 ## Client/Server Boundary Proof
 
@@ -68,16 +93,31 @@ Automated static checks verify:
 - `src/lib/supabase/admin.ts` is guarded by `server-only`;
 - `src/lib/supabase/browser.ts` uses only public Supabase environment values;
 - `current-actor.ts` uses server-side `getUser()` and never request/query
-  identity fields;
+  identity fields; this is the verified server-side equivalent for claim
+  validation in the Supabase SSR client used here;
 - active auth cutover files do not import or invoke Resend, Inngest, Pinecone,
   PostHog, or Sentry provider runtimes.
+
+Remaining manual staging checks:
+
+- disabled rollout flags leave legacy Auth.js behavior active;
+- confirmed signup through the staging Supabase project;
+- repeated, expired, malformed, and open-redirect callback attempts;
+- legacy-email collision;
+- linked and unlinked Supabase login;
+- legacy Auth.js login;
+- conflicting sessions;
+- logout;
+- protected-route access across chat, dashboard, knowledge, voice, events,
+  telemetry, scripture review, onboarding, and admin Voice QA;
+- rollback by disabling rollout flags.
 
 ## Validation Evidence
 
 - `npm run format:check`: passed.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
-- `npm run test`: passed, 51 files / 263 tests.
+- `npm run test`: passed, 52 files / 270 tests.
 - `set -a; source .env.test; set +a; npm run build`: passed.
 - `npm audit --audit-level=high`: passed; low/moderate advisories remain.
 - `npm run secrets:check`: passed.
@@ -90,8 +130,9 @@ Notes:
 - Plain `npm run build` without any environment failed because strict
   production env validation requires `AUTH_SECRET` and `DATABASE_URL`, and Next
   does not load `.env.test` for production builds.
-- `npx prisma migrate status` with `.env.test` failed because the placeholder
-  Postgres database is not running locally.
+- `set -a; source .env.test; set +a; npx prisma migrate status` failed with
+  `Error: Schema engine error:` because the placeholder Postgres database is not
+  running locally.
 
 ## Explicit Confirmations
 
