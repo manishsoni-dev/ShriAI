@@ -11,17 +11,20 @@ certification without starting P0.3C.
 
 - Isolated worktree: `/Users/manishh/Desktop/Shri AI P0.3B.2`.
 - Branch: `codex/p0-3b-2-integration-staging-certification`.
-- Current `origin/main`: `cbade94 Merge P0.1 release integrity hardening`.
-- Current branch head after bringing in current main:
-  `e60c23b Merge origin/main into P0.3B.2 certification`.
-- Current merge base with `origin/main`: `cbade94`.
-- Current worktree state before documentation refresh: `git status --short`
+- Current `origin/main`: `68c521a Merge pull request #6 from
+manishsoni-dev/codex/source-archive-safety-correction`.
+- Current branch head before this continuation:
+  `fbf987f docs: refresh p0.3b.2 certification topology`.
+- Current merge base with `origin/main` before this continuation: `cbade94`.
+- Current worktree state before this documentation update: `git status --short`
   clean.
-- Current P0.3B.2 commits ahead of `origin/main`:
-  `e60c23b Merge origin/main into P0.3B.2 certification` and
+- Current P0.3B.2 commits ahead of the old merge base:
+  `fbf987f docs: refresh p0.3b.2 certification topology`,
+  `e60c23b Merge origin/main into P0.3B.2 certification`, and
   `b713baf feat: certify p0.3b integration recovery`.
 - Current `origin/main...HEAD` diff is limited to P0.3B.2 auth, Supabase,
-  route, test, CI/test-environment, and documentation files.
+  route, test, CI/test-environment, and documentation files, but the branch is
+  behind current `origin/main` by merged P0.2 and source-archive safety work.
 - Preflight from the original P0.3B.1 worktree verified:
   - `git fetch origin --prune`: passed.
   - `git worktree list`: recorded P0.3B.1, P0.1 Clean, P0.2 Clean, P0.3A,
@@ -39,8 +42,10 @@ certification without starting P0.3C.
   P0.1 Clean, P0.2 Clean, P0.3A, and baseline worktrees are clean and were not
   modified by this task.
 - PR state from GitHub:
-  PR #4 is the active P0.3B.2 draft PR and was clean with passing CI and
-  ArchGuard before the current-main merge; checks must rerun after push.
+  PR #4 is the active P0.3B.2 draft PR and is open. Its prior checks were green
+  (`caddy-validate`, `build-and-test`, and ArchGuard), but they are stale
+  because `origin/main` has advanced through PR #5 and PR #6. Checks must rerun
+  after current `origin/main` is merged into the branch and pushed.
   PR #3 is superseded by P0.3B.2. PR #1 is unrelated and merge-dirty.
 
 ## Scope
@@ -52,7 +57,8 @@ certification without starting P0.3C.
 - Test database safety preflight and documentation.
 - P0.3B.2 integration report, research decision log, and staging checklist.
 - GitHub Actions updates for deterministic CI commands.
-- Refresh P0.3B.2 docs after merging current `origin/main` into the branch.
+- Refresh P0.3B.2 docs after merging the latest current `origin/main` into the
+  branch.
 
 ## Out-Of-Scope Work
 
@@ -148,6 +154,8 @@ Database integration checks must run only with an explicit disposable
   turn and was verified before further work.
 - Merged current `origin/main` (`cbade94`) into P0.3B.2 with a normal merge
   commit, avoiding rebase/force-push/history rewriting.
+- Verified on continuation that `origin/main` has advanced to `68c521a` and PR
+  #4 must be refreshed again before it can be treated as integrated.
 - Recorded mandatory preflight evidence and refreshed the task scope.
 - Integrated the net P0.3A/P0.3B.1 controlled Supabase Auth staging diff while
   excluding the old task-document churn and the reverted source-archive history.
