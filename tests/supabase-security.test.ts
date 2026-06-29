@@ -214,6 +214,7 @@ describe("Supabase health states expose only safe codes", () => {
     expect(healthSrc).toContain("SUPABASE_NOT_CONFIGURED");
     expect(healthSrc).toContain("SUPABASE_UNAVAILABLE");
     expect(healthSrc).toContain("SUPABASE_AUTH_UNAVAILABLE");
+    expect(healthSrc).toContain("SUPABASE_AUTH_SESSION_INVALID");
     expect(healthSrc).toContain("SUPABASE_AUTH_LINK_MISSING");
   });
 
@@ -224,6 +225,61 @@ describe("Supabase health states expose only safe codes", () => {
     expect(healthSrc).not.toContain("PASSWORD");
     expect(healthSrc).not.toContain("credentials");
     expect(healthSrc).not.toContain("authorization");
+  });
+});
+
+describe("P0.3B.1 managed-service runtime activation guard", () => {
+  it("active auth cutover files do not import dormant provider runtimes", () => {
+    const files = [
+      "src/app/sign-in/actions.ts",
+      "src/app/api/auth/supabase/callback/route.ts",
+      "src/app/actions/logout.ts",
+      "src/lib/auth/get-authenticated-user.ts",
+      "src/lib/auth/current-actor.ts",
+    ];
+    const forbidden = [
+      "@/lib/providers/resend",
+      "@/lib/providers/inngest",
+      "@/lib/providers/pinecone",
+      "@/lib/providers/posthog",
+      "@/lib/providers/sentry",
+      "getResendBoundary",
+      "getInngestBoundary",
+      "getPineconeBoundary",
+      "getPostHogBoundary",
+      "getSentryBoundary",
+      "RESEND_API_KEY",
+      "INNGEST_EVENT_KEY",
+      "PINECONE_API_KEY",
+      "NEXT_PUBLIC_POSTHOG_KEY",
+      "SENTRY_AUTH_TOKEN",
+    ];
+    const violations: string[] = [];
+
+    for (const file of files) {
+      const src = readSrc(file);
+      for (const pattern of forbidden) {
+        if (src.includes(pattern)) {
+          violations.push(`${file} references ${pattern}`);
+        }
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
+  it("rollout flags default to disabled and do not activate dormant providers", () => {
+    const envSrc = readSrc("src/env.ts");
+    const rolloutSrc = readSrc("src/lib/supabase/rollout.ts");
+
+    expect(envSrc).toContain("SUPABASE_AUTH_NEW_ACCOUNT_ENABLED");
+    expect(envSrc).toContain('.default("false")');
+    expect(envSrc).toContain("SUPABASE_AUTH_LINKED_SIGNIN_ENABLED");
+    expect(rolloutSrc).not.toContain("resend");
+    expect(rolloutSrc).not.toContain("inngest");
+    expect(rolloutSrc).not.toContain("pinecone");
+    expect(rolloutSrc).not.toContain("posthog");
+    expect(rolloutSrc).not.toContain("sentry");
   });
 });
 

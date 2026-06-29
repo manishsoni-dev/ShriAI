@@ -1,240 +1,210 @@
-# Current Task: P0.3A — Supabase Auth Foundation and Safe Migration Scaffold
+# Current Task: P0.3B.1 - Auth Cutover Certification Fixes
 
 ## Objective
 
-Implement the Supabase Auth client boundaries, server-only current-actor
-resolver, internal migration states, safe health states, migration
-documentation, and comprehensive security tests — without cutting over live
-authentication, creating Supabase users, migrating passwords, or activating any
-managed external service.
+Remove the global test environment-validation bypass, use safe test-only
+placeholders, repair mocks and tests affected by the Auth.js to
+`getAuthenticatedUser()` cutover, and certify the Supabase/Auth.js arbitration
+without starting P0.3C or activating dormant managed services.
 
 ## Verified Current Flow
 
-- Auth.js is the production auth path (unchanged).
-- `User.supabaseAuthUserId String? @unique @db.Uuid` exists in the Prisma schema
-  (applied in P0.2.1).
-- P0.1, P0.2, P0.2.1, and the baseline verification were merged into `main`.
-- This branch (`codex/p0-3a-supabase-auth-foundation`) was created from merged
-  `main` and contains only P0.3A scope additions.
+- Branch is `codex/p0-3b-1-auth-certification`.
+- `tests/setup.ts` now loads `.env.test` through `dotenv`; it does not set a
+  global environment-validation bypass.
+- `.env.test` contains only safe placeholders required by `src/env.ts`:
+  `AUTH_SECRET` and `DATABASE_URL`.
+- `getAuthenticatedUser()` arbitrates between Supabase and Auth.js:
+  - missing Supabase session can fall back to Auth.js;
+  - invalid Supabase session is denied and clears sessions;
+  - unlinked Supabase session is denied;
+  - conflicting Supabase/Auth.js identities are denied and clear sessions;
+  - linked Supabase identity wins when it matches the legacy session.
+- Protected product surfaces now import `getAuthenticatedUser as auth` instead
+  of importing Auth.js directly.
+- `npm run build` without any environment still fails strict validation because
+  production builds do not load `.env.test`; exporting the same safe
+  placeholders from `.env.test` makes the build pass.
+- `npx prisma migrate status` cannot complete against the safe placeholder
+  database URL because no local Postgres test database is running.
 
 ## Scope
 
-- `src/lib/supabase/browser.ts`: Browser-safe client (public keys only).
-- `src/lib/supabase/server.ts`: Server-side client with cookie management.
-- `src/lib/supabase/proxy.ts`: Middleware proxy client.
-- `src/lib/supabase/admin.ts`: Server-only admin client (secret key only).
-- `src/lib/supabase/health.ts`: Health state constants.
-- `src/lib/auth/current-actor.ts`: Server-only actor resolver.
-- `src/lib/auth/migration-state.ts`: Internal migration state types.
-- `src/lib/supabase/client-boundaries.test.ts`: Config and admin isolation tests.
-- `src/lib/auth/current-actor.test.ts`: Actor resolver unit tests.
-- `tests/supabase-security.test.ts`: Comprehensive security boundary tests.
-- `docs/security/SUPABASE_AUTH_MIGRATION.md`: Full migration documentation.
-- `docs/development/CURRENT_TASK.md`: This file.
+- Test environment setup.
+- Auth resolver/session arbitration and tests.
+- Supabase callback and unified logout hardening tests.
+- Broken Vitest mocks caused by protected surfaces switching from Auth.js to
+  `getAuthenticatedUser()`.
+- Static/runtime-boundary tests proving no Supabase secret or dormant provider
+  runtime reaches active browser/auth paths.
+- P0.3B certification and staging checklist documentation.
 
 ## Out-Of-Scope Work
 
-- No live authentication cutover.
-- No Auth.js removal or modification.
-- No password migration.
-- No creation, linking, modification, backfill, or deletion of Supabase Auth users.
-- No activation of Resend, Pinecone, Inngest, PostHog, or Sentry.
-- No wiring of `getCurrentActor` into active product routes.
-- No sign-in UI changes.
+- No P0.3C.
+- No Resend API notifications.
+- No Inngest, Pinecone, PostHog, Sentry, or hosted LLM activation.
+- No Supabase rollout flag enablement.
+- No creation, linking, backfill, modification, or deletion of real Supabase
+  users.
+- No real `.env` or `.env.local` copying, printing, inspecting, or committing.
 
 ## Decisions
 
-- `admin.ts` uses `import "server-only"` to block webpack/Turbopack from
-  including it in browser bundles. This causes a build-time error if imported
-  in a Client Component.
-- `current-actor.ts` uses `client.auth.getUser()` (server-side JWT validation),
-  never `getSession()`, to prevent spoofed claims.
-- `migration-state.ts` uses `import "server-only"` to enforce internal-only
-  access.
-- All clients use lazy initialization (config check before client creation).
-- Missing configuration returns `SUPABASE_NOT_CONFIGURED` safely without
-  throwing.
-- `@ts-expect-error` is used in tests where vitest mock types conflict with the
-  strict TypeScript configuration, documented inline.
+- `.env.test` is intentionally tracked and contains safe placeholders only.
+- `scripts/check-secret-containment.mjs` treats `.env.test` like
+  `.env.example`: allowed when placeholder-only, still scanned for secret
+  patterns.
+- Invalid Supabase sessions are distinct from missing Supabase sessions.
+  Missing sessions preserve legacy Auth.js compatibility; invalid sessions deny
+  access and trigger unified logout.
+- Unified logout continues to Auth.js sign-out even if Supabase sign-out fails.
 
 ## Acceptance Criteria
 
-- [x] `src/lib/supabase/browser.ts` — browser client, public keys only.
-- [x] `src/lib/supabase/server.ts` — server client, server-only.
-- [x] `src/lib/supabase/proxy.ts` — middleware proxy client.
-- [x] `src/lib/supabase/admin.ts` — server-only, secret key only.
-- [x] `src/lib/supabase/health.ts` — 4 health state constants.
-- [x] `src/lib/auth/current-actor.ts` — resolves linked user by supabaseAuthUserId.
-- [x] `src/lib/auth/migration-state.ts` — 5 internal states, server-only.
-- [x] `docs/security/SUPABASE_AUTH_MIGRATION.md` — all 11 required sections.
-- [x] Tests: 243 total tests pass across 48 test files (26 new security tests).
-- [x] All pipeline checks pass (secrets, format, lint, typecheck, test, build,
-      audit, prisma:generate, prisma validate, prisma migrate status).
-- [x] `git diff --check` passes.
-- [x] `git status --short` is empty (clean worktree after commit).
-- [x] No live auth cutover. No Supabase users created or modified.
+- No executable global environment-validation bypass remains.
+- Full Vitest suite passes without the bypass.
+- Safe `.env.test` placeholders satisfy test-time schema validation.
+- Broken mocks from `auth()` replacement are repaired.
+- Tests prove invalid/unlinked Supabase denial, conflicting-session denial,
+  legacy Auth.js fallback, Supabase secret browser isolation, and dormant
+  managed-service non-activation.
+- Required validation commands pass or blockers are documented truthfully.
+- Commit only the P0.3B.1 certification repair on this branch.
 
 ## Files Expected To Change
 
-- `src/lib/supabase/browser.ts` ✅ (new)
-- `src/lib/supabase/server.ts` ✅ (new)
-- `src/lib/supabase/proxy.ts` ✅ (new)
-- `src/lib/supabase/admin.ts` ✅ (new)
-- `src/lib/supabase/health.ts` ✅ (new)
-- `src/lib/auth/current-actor.ts` ✅ (new)
-- `src/lib/auth/migration-state.ts` ✅ (new, server-only)
-- `src/lib/supabase/client-boundaries.test.ts` ✅ (new)
-- `src/lib/auth/current-actor.test.ts` ✅ (new)
-- `tests/supabase-security.test.ts` ✅ (new, 26 security tests)
-- `docs/security/SUPABASE_AUTH_MIGRATION.md` ✅ (new, comprehensive)
-- `docs/development/CURRENT_TASK.md` ✅ (this file)
+- `.env.test`
+- `.gitignore`
+- `docs/development/CURRENT_TASK.md`
+- `docs/development/P0_3B_CERTIFICATION.md`
+- `docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md`
+- `scripts/check-secret-containment.mjs`
+- `src/app/actions/logout.ts`
+- `src/app/actions/logout.test.ts`
+- `src/app/api/auth/supabase/callback/route.test.ts`
+- `src/lib/auth/current-actor.ts`
+- `src/lib/auth/current-actor.test.ts`
+- `src/lib/auth/get-authenticated-user.ts`
+- `src/lib/supabase/health.ts`
+- `tests/lib/auth/get-authenticated-user.test.ts`
+- `tests/setup.ts`
+- `tests/supabase-security.test.ts`
+- Existing P0.3B cutover files and mocks already dirty in this branch.
+
+## Files That Must Remain Unchanged
+
+- Real `.env*` files other than the safe tracked `.env.test`.
+- Production database schema.
+- Product UI and non-auth product behavior.
+- Dormant managed-service runtime implementations.
 
 ## Tests Required
 
-- [x] Missing Supabase configuration returns SUPABASE_NOT_CONFIGURED safely.
-- [x] Admin client blocked from browser bundles (server-only directive).
-- [x] Secret key absent from browser bundle (static analysis of client components).
-- [x] Admin client blocked from client component imports.
-- [x] Invalid, expired, malformed, spoofed claims rejected (getUser validation).
-- [x] Linked subject resolves only its own application user (findUnique by UUID).
-- [x] Unlinked subject returns SUPABASE_AUTH_LINK_MISSING, no fallback.
-- [x] Cross-user isolation: findUnique (not findFirst) + @unique schema constraint.
-- [x] Auth.js sign-in route unchanged (does not reference Supabase).
-- [x] Auth.js tests still pass (9 tests in actions.test.ts).
-- [x] Health output excludes sensitive data (route test + security test).
-- [x] Reviewer authorization tests pass.
-- [x] Upload, RAG, voice tests pass (all 47 pre-existing test files pass).
-- [x] Migration state is internal-only (not in API handlers).
+- `npm run secrets:check`
+- `npm run format:check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `npm audit --audit-level=high`
+- `npm run prisma:generate`
+- `npx prisma validate`
+- `git diff --check`
+- `git status --short`
 
 ## Verification Commands
 
 ```bash
-npm run secrets:check   # ✅ PASS
-npm run format:check    # ✅ PASS
-npm run lint            # ✅ PASS
-npm run typecheck       # ✅ PASS
-npm run test            # ✅ PASS (243 tests, 48 files)
-npm run build           # ✅ PASS
-npm audit --audit-level=high  # ✅ PASS (0 high/critical)
-npm run prisma:generate # ✅ PASS
-npx prisma validate     # ✅ PASS
-npx prisma migrate status  # ✅ PASS (25 migrations, up to date)
-git diff --check        # ✅ PASS
-git status --short      # ✅ EMPTY (clean)
+git status --short
+git branch --show-current
+git log --oneline -10
+git diff --stat
+git diff
+git diff --check
+git ls-files -- .env .env.local .env.production .env.development
+git log --all -- .env .env.local .env.production .env.development
+npm run secrets:check
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm audit --audit-level=high
+npm run prisma:generate
+npx prisma validate
 ```
 
 ## Implementation Log
 
 ### What Was Implemented
 
-**Supabase client boundaries** (`src/lib/supabase/`):
-
-- `browser.ts`: Lazy-initialized browser client using only public env vars.
-  Returns `SUPABASE_NOT_CONFIGURED` if env vars are absent.
-- `server.ts`: Server-only client with `import "server-only"`, cookie
-  management via `next/headers`, lazy initialization.
-- `proxy.ts`: Middleware proxy client reading/writing cookies from
-  `NextRequest`/`NextResponse`.
-- `admin.ts`: Server-only admin client with `import "server-only"`, uses only
-  `SUPABASE_SECRET_KEY`, auto-refresh and session persistence disabled.
-- `health.ts`: Exports `SUPABASE_NOT_CONFIGURED`, `SUPABASE_UNAVAILABLE`,
-  `SUPABASE_AUTH_UNAVAILABLE`, `SUPABASE_AUTH_LINK_MISSING` constants.
-
-**Auth actor resolver** (`src/lib/auth/`):
-
-- `current-actor.ts`: Server-only resolver that validates claims via
-  `client.auth.getUser()`, resolves to the linked `User` by
-  `supabaseAuthUserId`, returns a minimal safe actor, never falls back on
-  unlinked identities.
-- `migration-state.ts`: Internal-only `AuthMigrationState` type with 5 states
-  (UNLINKED, PROVISIONED, VERIFIED, CUTOVER_READY, DISABLED), guarded by
-  `import "server-only"`.
-
-**Tests** (3 test files, 31 total tests):
-
-- `src/lib/supabase/client-boundaries.test.ts`: 2 tests for missing config
-  and admin-key isolation.
-- `src/lib/auth/current-actor.test.ts`: 3 tests for invalid claims, unlinked
-  identities, and valid linked identity resolution.
-- `tests/supabase-security.test.ts`: 26 tests (static analysis + design
-  verification) covering all P0.3A security requirements.
-
-**Documentation**:
-
-- `docs/security/SUPABASE_AUTH_MIGRATION.md`: 11 sections covering current vs
-  target architecture, identity-link model, staged migration plan, rollback,
-  recovery/session invalidation, environment separation, Supabase Dashboard
-  checklist, redirect URL rules, RLS requirements, secret-key handling, and
-  explicit OUT OF SCOPE confirmation.
+- Removed the executable global test env-validation bypass and replaced it with
+  `.env.test` loading in `tests/setup.ts`.
+- Added safe tracked `.env.test` placeholders for `AUTH_SECRET` and
+  `DATABASE_URL`.
+- Updated secret containment to allow and scan placeholder-only `.env.test`.
+- Repaired protected-route tests to mock `getAuthenticatedUser()`.
+- Added `SUPABASE_AUTH_SESSION_INVALID` so invalid Supabase sessions deny
+  access while missing Supabase sessions can still use legacy Auth.js.
+- Added callback tests for missing code, fixed redirects, failed exchanges,
+  unconfirmed email, legacy-email collision, idempotent linked subjects, and
+  new confirmed subject provisioning.
+- Added unified logout tests, including Supabase-not-configured and Supabase
+  sign-out failure behavior.
+- Added security tests proving dormant Resend, Inngest, Pinecone, PostHog, and
+  Sentry provider runtimes are not activated by active auth cutover files.
 
 ### Files Changed
 
-- `src/lib/supabase/browser.ts` (new)
-- `src/lib/supabase/server.ts` (new)
-- `src/lib/supabase/proxy.ts` (new)
-- `src/lib/supabase/admin.ts` (new)
-- `src/lib/supabase/health.ts` (new)
-- `src/lib/supabase/client-boundaries.test.ts` (new)
-- `src/lib/auth/current-actor.ts` (new)
-- `src/lib/auth/current-actor.test.ts` (new)
-- `src/lib/auth/migration-state.ts` (new, updated with server-only)
-- `tests/supabase-security.test.ts` (new)
-- `docs/security/SUPABASE_AUTH_MIGRATION.md` (new, comprehensive)
-- `docs/development/CURRENT_TASK.md` (updated)
+- Pending final staged list.
 
 ### Decisions Made
 
-- Used `import "server-only"` on admin.ts, server.ts, current-actor.ts, and
-  migration-state.ts to get build-time enforcement of server/client boundaries.
-- Used `client.auth.getUser()` over `getSession()` to prevent spoofed claims.
-- Used `findUnique` (not `findFirst`) to leverage the DB uniqueness constraint
-  for cross-user isolation.
-- Used `@ts-expect-error` (with description) in test mocks where vitest mock
-  types conflict with strict TypeScript configuration.
-- Made all clients lazily initialized — config check before client creation.
+- Keep `.env.test` safe and tracked instead of copying real local env files.
+- Keep strict env validation active in tests, build, and production.
+- Use safe placeholder env exports for local `next build` verification because
+  Next production builds do not load `.env.test` automatically.
 
 ### Tests Run
 
-- `npm run secrets:check`: ✅ PASS
-- `npm run format:check`: ✅ PASS (after formatting)
-- `npm run lint`: ✅ PASS (0 warnings, 0 errors)
-- `npm run typecheck`: ✅ PASS (0 type errors)
-- `npm run test`: ✅ PASS (243 tests, 48 files, including 26 new security tests)
-- `npm run build`: ✅ PASS (optimized production build)
-- `npm audit --audit-level=high`: ✅ PASS (0 high/critical vulnerabilities)
-- `npm run prisma:generate`: ✅ PASS
-- `npx prisma validate`: ✅ PASS
-- `npx prisma migrate status`: ✅ PASS (25 migrations, up to date)
-- `git diff --check`: ✅ PASS
-- `git status --short`: ✅ EMPTY
+- `npm run test -- src/lib/auth/current-actor.test.ts tests/lib/auth/get-authenticated-user.test.ts src/app/actions/logout.test.ts src/app/api/auth/supabase/callback/route.test.ts tests/supabase-security.test.ts src/lib/providers/providers.test.ts`:
+  passed, 6 files / 53 tests.
+- `npm run format:check`: passed.
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm run test`: passed, 51 files / 263 tests.
+- `npm audit --audit-level=high`: passed; low/moderate advisories remain.
+- `npm run secrets:check`: passed.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
+- `git diff --check`: passed.
+- `set -a; source .env.test; set +a; npm run build`: passed.
 
 ### Checks Passed
 
-All required checks passed.
+- No executable environment-validation bypass remains.
+- Full suite passes without the bypass.
+- Safe placeholder env supports tests and build verification.
+- Secret containment still passes with tracked `.env.test` allowed and scanned.
 
 ### Checks Failed
 
-None.
+- `npm run build` without any environment failed because strict env validation
+  requires `AUTH_SECRET` and `DATABASE_URL`; `.env.test` is not loaded by Next
+  production builds.
+- `npx prisma migrate status` with `.env.test` failed because no local Postgres
+  test database is serving at `localhost:5432`.
 
 ### Remaining Blockers
 
-None for P0.3A.
-
-Manual actions (outside agent scope):
-
-- Rotate `AUTH_SECRET` and database credentials as documented in the security
-  runbook before any public release.
-- Complete Supabase Dashboard setup checklist (Section 7 of
-  `SUPABASE_AUTH_MIGRATION.md`) before starting P0.3B.
+- Final staging/commit still pending.
+- If strict local `npm run build` with no shell env is required, the environment
+  must provide safe build-time values or real deployment values without using a
+  validation bypass.
 
 ### Recommended Next Task
 
-**P0.3B: Controlled Supabase Auth Account Creation and Sign-In Cutover**
-
-Prerequisites before starting P0.3B:
-
-1. This P0.3A PR must be reviewed and merged into `main`.
-2. Supabase Dashboard setup checklist (Section 7) must be completed for the
-   target environment.
-3. The P0.3B branch must be created from merged `main`.
-4. All P0.3A pipeline checks must pass from a clean worktree on the new branch.
+- Stage explicit P0.3B.1 files only, rerun final diff/status checks, commit on
+  `codex/p0-3b-1-auth-certification`, then open or push according to release
+  workflow.

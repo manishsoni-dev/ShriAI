@@ -3,6 +3,7 @@ import { getCurrentActor } from "./current-actor";
 import { db } from "../db";
 import { createServerClient } from "../supabase/server";
 import {
+  SUPABASE_AUTH_SESSION_INVALID,
   SUPABASE_AUTH_UNAVAILABLE,
   SUPABASE_AUTH_LINK_MISSING,
 } from "../supabase/health";
@@ -24,8 +25,30 @@ describe("getCurrentActor", () => {
     vi.clearAllMocks();
   });
 
-  it("rejects missing or invalid claims (UNAUTHENTICATED)", async () => {
+  it("allows legacy fallback when no Supabase session exists", async () => {
     // Mock configured client but unauthenticated
+    // @ts-expect-error - mock
+    createServerClient.mockResolvedValue({
+      status: "CONFIGURED",
+      client: {
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: null },
+            error: Object.assign(new Error("Auth session missing"), {
+              name: "AuthSessionMissingError",
+            }),
+          }),
+        },
+      },
+    });
+
+    const result = await getCurrentActor();
+    expect(result.actor).toBeNull();
+    expect(result.reason).toBe(SUPABASE_AUTH_UNAVAILABLE);
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid Supabase claims without falling back", async () => {
     // @ts-expect-error - mock
     createServerClient.mockResolvedValue({
       status: "CONFIGURED",
@@ -41,7 +64,7 @@ describe("getCurrentActor", () => {
 
     const result = await getCurrentActor();
     expect(result.actor).toBeNull();
-    expect(result.reason).toBe(SUPABASE_AUTH_UNAVAILABLE);
+    expect(result.reason).toBe(SUPABASE_AUTH_SESSION_INVALID);
     expect(db.user.findUnique).not.toHaveBeenCalled();
   });
 

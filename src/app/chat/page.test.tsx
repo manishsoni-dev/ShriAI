@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     ConversationAccessError: MockConversationAccessError,
-    auth: vi.fn(),
+    getAuthenticatedUser: vi.fn(),
     userFindUnique: vi.fn(),
     ensureDefaultWorkspace: vi.fn(),
     listConversations: vi.fn(),
@@ -30,8 +30,9 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }));
 
-vi.mock("@/auth", () => ({
-  auth: mocks.auth,
+vi.mock("@/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
+vi.mock("@/lib/auth/get-authenticated-user", () => ({
+  getAuthenticatedUser: mocks.getAuthenticatedUser,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -69,7 +70,7 @@ function searchParams(params: { conversationId?: string; persona?: string }) {
 beforeEach(() => {
   vi.clearAllMocks();
 
-  mocks.auth.mockResolvedValue({ user: { id: OWNER_ID } });
+  mocks.getAuthenticatedUser.mockResolvedValue({ user: { id: OWNER_ID } });
   mocks.userFindUnique.mockResolvedValue({
     id: OWNER_ID,
     email: "owner@example.com",

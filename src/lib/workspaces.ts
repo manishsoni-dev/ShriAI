@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 
 function slugify(value: string) {
   return value
@@ -9,12 +10,16 @@ function slugify(value: string) {
     .slice(0, 48);
 }
 
-export async function ensureDefaultWorkspace(user: {
-  id: string;
-  email: string;
-  name?: string | null;
-}) {
-  const existingMembership = await db.workspaceMember.findFirst({
+export async function ensureDefaultWorkspace(
+  user: {
+    id: string;
+    email: string;
+    name?: string | null;
+  },
+  tx?: Prisma.TransactionClient,
+) {
+  const client = tx ?? db;
+  const existingMembership = await client.workspaceMember.findFirst({
     where: {
       userId: user.id,
     },
@@ -34,7 +39,7 @@ export async function ensureDefaultWorkspace(user: {
   const baseSlug = slugify(label) || "workspace";
   const slug = `${baseSlug}-${user.id.slice(0, 8)}`;
 
-  const workspace = await db.workspace.create({
+  const workspace = await client.workspace.create({
     data: {
       name: `${label}'s Workspace`,
       slug,

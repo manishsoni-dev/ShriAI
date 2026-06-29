@@ -3,8 +3,25 @@ import { createServerClient } from "../supabase/server";
 import { db } from "../db";
 import {
   SUPABASE_AUTH_UNAVAILABLE,
+  SUPABASE_AUTH_SESSION_INVALID,
   SUPABASE_AUTH_LINK_MISSING,
 } from "../supabase/health";
+
+function isMissingSupabaseSession(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { name?: unknown; message?: unknown };
+  const name = typeof candidate.name === "string" ? candidate.name : "";
+  const message =
+    typeof candidate.message === "string" ? candidate.message : "";
+
+  return (
+    name === "AuthSessionMissingError" ||
+    message.toLowerCase().includes("auth session missing")
+  );
+}
 
 export async function getCurrentActor() {
   const { client, status } = await createServerClient();
@@ -19,7 +36,16 @@ export async function getCurrentActor() {
     error,
   } = await client.auth.getUser();
 
-  if (error || !user || !user.id) {
+  if (error) {
+    return {
+      actor: null,
+      reason: isMissingSupabaseSession(error)
+        ? SUPABASE_AUTH_UNAVAILABLE
+        : SUPABASE_AUTH_SESSION_INVALID,
+    };
+  }
+
+  if (!user || !user.id) {
     return { actor: null, reason: SUPABASE_AUTH_UNAVAILABLE };
   }
 

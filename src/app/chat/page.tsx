@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { ChatShell } from "@/app/chat/chat-shell";
 import {
   ConversationAccessError,
