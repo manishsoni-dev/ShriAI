@@ -1,193 +1,229 @@
-# Current Task: Clean Integration and Migration Correction
+# Current Task: P0.3B.1 - Auth Cutover Certification Fixes
 
 ## Objective
 
-Cleanly integrate the existing P0.1 and P0.2 work without committing the entire
-dirty worktree. First preserve the secret-rotation requirement as an explicit
-manual maintainer action, then inventory and isolate P0.1, rebase/correct P0.2,
-add hosted Caddy validation, create a verified safe source archive only from a
-clean committed tree, and leave P0.3A gated until all required conditions are
-true.
+Remove the global test environment-validation bypass, use safe test-only
+placeholders, repair mocks and tests affected by the Auth.js to
+`getAuthenticatedUser()` cutover, and certify the Supabase/Auth.js arbitration
+without starting P0.3C or activating dormant managed services.
 
 ## Verified Current Flow
 
-- Manual secret rotation is required before public sharing, but it cannot be
-  performed by this local agent without the actual external account credentials
-  and account-owner actions:
-  - rotate `AUTH_SECRET`;
-  - rotate database password/connection credentials;
-  - rotate local STT token;
-  - rotate any third-party credentials later added;
-  - remove old ZIP copies from Drive, GitHub releases, chat uploads, and local
-    shared folders.
-- Required inventory commands were run:
-  - `git status --short`: broad dirty tree with tracked modifications and many
-    untracked files.
-  - `git diff --name-only`: 58 tracked modified files.
-  - `git diff --stat`: 58 tracked files, 2749 insertions, 1252 deletions.
-  - `git diff --check`: passed.
-  - `git ls-files -- .env .env.local .env.production .env.development`: no
-    tracked env files.
-  - `git log --all -- .env .env.local .env.production .env.development`: no
-    local history for those env files.
-- Branch state:
-  - current branch: `codex/p0-2-managed-services-foundation`;
-  - local `codex/p0-1-release-integrity` and `codex/p0-2-managed-services-foundation`
-    both point at `ce434da`;
-  - `main` points at `864dc69`;
-  - remote `origin/main` points at `864dc69`;
-  - remote `origin/p0-trust-hardening` exists at `3c61e14`.
-- Existing CI currently has one `build-and-test` job in
-  `.github/workflows/ci.yml`; it does not yet include a Caddy validation job.
-- The current dirty tree includes previous P0.1/P0.2 work and unrelated WIP, so
-  `git add -A`, `git commit -am`, or a whole-tree merge would be incorrect.
+- Branch is `codex/p0-3b-1-auth-certification`.
+- Out-of-scope archive/Caddy commit `2b88e69` was reverted with `cf8c082`,
+  returning this branch to P0.3B.1 auth-certification scope.
+- `tests/setup.ts` now loads `.env.test` through `dotenv`; it does not set a
+  global environment-validation bypass.
+- `.env.test` contains only safe placeholders required by `src/env.ts`:
+  `AUTH_SECRET` and `DATABASE_URL`.
+- `getAuthenticatedUser()` arbitrates between Supabase and Auth.js:
+  - missing Supabase session can fall back to Auth.js;
+  - invalid Supabase session is denied and clears sessions;
+  - unlinked Supabase session is denied;
+  - conflicting Supabase/Auth.js identities are denied and clear sessions;
+  - linked Supabase identity wins when it matches the legacy session.
+- Protected product surfaces now import `getAuthenticatedUser as auth` instead
+  of importing Auth.js directly.
+- Actual route inventory confirms there are no `saved` or `settings` routes in
+  this branch; certification docs record those requested surfaces as not
+  present rather than inventing coverage.
+- `npm run build` without any environment still fails strict validation because
+  production builds do not load `.env.test`; exporting the same safe
+  placeholders from `.env.test` makes the build pass.
+- `npx prisma migrate status` cannot complete against the safe placeholder
+  database URL because no local Postgres test database is running.
 
 ## Scope
 
-- Inventory and classify the dirty worktree.
-- Build an isolated P0.1 branch/commit from a clean baseline, including only:
-  release integrity, audit remediation, archive safety, Voice QA integrity, CI
-  split, evaluation fail-fast behavior, and Caddy test/docs.
-- Exclude runtime files, generated outputs, unrelated WIP, P0.2 provider work,
-  and mutable `CURRENT_TASK.md` churn from the P0.1 commit.
-- After P0.1 isolation, prepare P0.2 on top of P0.1 with provider boundaries,
-  configuration, redaction, health states, event contracts, architecture docs,
-  and a corrective migration from generic `authUserId` to
-  `supabaseAuthUserId UUID`.
-- Add hosted CI Caddy validation using the same pinned Caddy container image as
-  deployment.
-- Create and verify a safe source archive only from a clean committed tree.
+- Test environment setup.
+- Auth resolver/session arbitration and tests.
+- Supabase callback and unified logout hardening tests.
+- Broken Vitest mocks caused by protected surfaces switching from Auth.js to
+  `getAuthenticatedUser()`.
+- Static/runtime-boundary tests proving no Supabase secret or dormant provider
+  runtime reaches active browser/auth paths.
+- P0.3B certification and staging checklist documentation.
 
 ## Out-Of-Scope Work
 
-- Do not start P0.3A.
-- Do not activate Supabase Auth.
-- Do not merge or commit the entire dirty worktree.
-- Do not use `git add -A` or `git commit -am`.
-- Do not commit runtime artifacts, generated eval output, local env files,
-  uploads, logs, databases, `.next`, `node_modules`, or mutable task-status
-  churn.
-- Do not use Replit unless a concrete import/deploy/environment task is added.
+- No P0.3C.
+- No Resend API notifications.
+- No Inngest, Pinecone, PostHog, Sentry, or hosted LLM activation.
+- No Supabase rollout flag enablement.
+- No creation, linking, backfill, modification, or deletion of real Supabase
+  users.
+- No real `.env` or `.env.local` copying, printing, inspecting, or committing.
 
 ## Decisions
 
-- Treat current worktree and external state as authoritative.
-- Preserve unrelated WIP by isolating patches from a clean baseline rather than
-  reverting the dirty working tree.
-- Keep manual secret rotation as a maintainer action and continue repo-local
-  cleanup progress.
-- The eventual P0.1 PR must be built from a clean branch and reviewed file by
-  file.
+- `.env.test` is intentionally tracked and contains safe placeholders only.
+- `scripts/check-secret-containment.mjs` treats `.env.test` like
+  `.env.example`: allowed when placeholder-only, still scanned for secret
+  patterns.
+- Invalid Supabase sessions are distinct from missing Supabase sessions.
+  Missing sessions preserve legacy Auth.js compatibility; invalid sessions deny
+  access and trigger unified logout.
+- Unified logout continues to Auth.js sign-out even if Supabase sign-out fails.
 
 ## Acceptance Criteria
 
-- Dirty worktree is classified by scope.
-- P0.1 exists as a clean scoped commit/PR without unrelated files.
-- P0.2 is rebased on merged P0.1 and contains the migration correction.
-- Hosted CI validates the Caddyfile using the pinned deployment Caddy image.
-- A fresh safe source archive is generated and verified from a clean committed
-  tree.
-- P0.3A remains blocked until all listed gates pass.
+- No executable global environment-validation bypass remains.
+- Full Vitest suite passes without the bypass.
+- Safe `.env.test` placeholders satisfy test-time schema validation.
+- Broken mocks from `auth()` replacement are repaired.
+- Tests prove invalid/unlinked Supabase denial, conflicting-session denial,
+  legacy Auth.js fallback, Supabase secret browser isolation, and dormant
+  managed-service non-activation.
+- Required validation commands pass or blockers are documented truthfully.
+- Commit only the P0.3B.1 certification repair on this branch.
 
 ## Files Expected To Change
 
+- `.env.test`
+- `.gitignore`
 - `docs/development/CURRENT_TASK.md`
-- Clean P0.1 branch files only after classification.
-- Clean P0.2 branch files only after P0.1 isolation.
+- `docs/development/P0_3B_CERTIFICATION.md`
+- `docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md`
+- `scripts/check-secret-containment.mjs`
+- `src/app/actions/logout.ts`
+- `src/app/actions/logout.test.ts`
+- `src/app/api/auth/supabase/callback/route.test.ts`
+- `src/lib/auth/current-actor.ts`
+- `src/lib/auth/current-actor.test.ts`
+- `src/lib/auth/get-authenticated-user.ts`
+- `src/lib/supabase/health.ts`
+- `tests/lib/auth/get-authenticated-user.test.ts`
+- `tests/setup.ts`
+- `tests/supabase-security.test.ts`
+- Existing P0.3B cutover files and mocks already dirty in this branch.
 
 ## Files That Must Remain Unchanged
 
-- Real local `.env*` files, databases, logs, uploads, and local model data.
-- Unrelated UI/product WIP unless specifically classified into P0.1 or P0.2.
+- Real `.env*` files other than the safe tracked `.env.test`.
+- Production database schema.
+- Product UI and non-auth product behavior.
+- Dormant managed-service runtime implementations.
 
 ## Tests Required
 
-- P0.1 branch:
-  - `npm run secrets:check`
-  - `npm run format:check`
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run test`
-  - `npm run build`
-  - `npm audit --audit-level=high`
-  - `npm run prisma:generate`
-  - `npx prisma validate`
-  - `git diff --check`
-  - hosted Caddy validation in CI
-- Later final gate before P0.3A:
-  - all commands listed in the objective must pass from a clean worktree.
+- `npm run secrets:check`
+- `npm run format:check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `npm audit --audit-level=high`
+- `npm run prisma:generate`
+- `npx prisma validate`
+- `git diff --check`
+- `git status --short`
 
 ## Verification Commands
 
 ```bash
 git status --short
-git diff --name-only
+git branch --show-current
+git log --oneline -10
 git diff --stat
+git diff
 git diff --check
 git ls-files -- .env .env.local .env.production .env.development
 git log --all -- .env .env.local .env.production .env.development
+npm run secrets:check
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm audit --audit-level=high
+npm run prisma:generate
+npx prisma validate
+npx prisma migrate status
+git diff --check
+git status --short
 ```
 
 ## Implementation Log
 
 ### What Was Implemented
 
-- Inventory and classification of dirty worktree completed.
-- P0.1 / P0.2 separation documented.
-- Added hosted CI Caddy validation using the same pinned Caddy container image (`caddy:2-alpine`) as deployment in `.github/workflows/ci.yml`.
-- Updated `scripts/verify-source-archive.mjs` to properly exclude eval artifacts (`data/evals`).
-- Verified `scripts/check-local-ai-readiness.ts` and `scripts/evaluate-scripture-retrieval.ts` fail fast safely with proper error codes and preservation of existing artifact state.
-- Checked `Caddyfile` and `tests/release-integrity.test.ts` to ensure `Permissions-Policy: microphone=(self)` remains enforced and CI configurations are pinned.
-- Committed Group 1 files (`prisma/schema.prisma`, `prisma/migrations/`, `src/lib/auth/users.ts`, `src/lib/auth/users.test.ts`, `scripts/create-source-archive.mjs`, `scripts/verify-source-archive.mjs`, `tests/release-integrity.test.ts`, `docs/development/BASELINE_RECONCILIATION.md`, `.github/workflows/ci.yml`) to `codex/p0-2-1-baseline-reconciliation`.
-- Ran automated validation gates (`secrets:check`, `format`, `lint`, `typecheck`, `test`, `build`, `db:ready`, `scripture:validate`, `release:check`).
+- Removed the executable global test env-validation bypass and replaced it with
+  `.env.test` loading in `tests/setup.ts`.
+- Added safe tracked `.env.test` placeholders for `AUTH_SECRET` and
+  `DATABASE_URL`.
+- Updated secret containment to allow and scan placeholder-only `.env.test`.
+- Repaired protected-route tests to mock `getAuthenticatedUser()`.
+- Added `SUPABASE_AUTH_SESSION_INVALID` so invalid Supabase sessions deny
+  access while missing Supabase sessions can still use legacy Auth.js.
+- Added callback tests for missing code, fixed redirects, failed exchanges,
+  unconfirmed email, legacy-email collision, idempotent linked subjects, and
+  new confirmed subject provisioning.
+- Added unified logout tests, including Supabase-not-configured and Supabase
+  sign-out failure behavior.
+- Added security tests proving dormant Resend, Inngest, Pinecone, PostHog, and
+  Sentry provider runtimes are not activated by active auth cutover files.
+- Added product-events route tests covering anonymous landing-page events,
+  denial for protected events without a resolved user, and ignoring
+  browser-supplied user identifiers.
+- Added static route-cutover certification tests proving migrated protected
+  surfaces import `getAuthenticatedUser`, direct Auth.js imports are limited to
+  owned auth boundary files, and absent saved/settings routes are documented.
+- Updated `docs/development/P0_3B_CERTIFICATION.md` with a route coverage
+  matrix and remaining staging checks.
 
 ### Files Changed
 
-- `.github/workflows/ci.yml`
-- `docs/development/CURRENT_TASK.md`
-- `prisma/migrations/20260628173000_add_supabase_auth_mapping/migration.sql`
-- `prisma/migrations/20260628180000_correct_supabase_auth_mapping/migration.sql`
-- `prisma/schema.prisma`
-- `scripts/create-source-archive.mjs`
-- `scripts/verify-source-archive.mjs`
-- `src/lib/auth/users.test.ts`
-- `src/lib/auth/users.ts`
-- `tests/release-integrity.test.ts`
-- `docs/development/BASELINE_RECONCILIATION.md`
+- Pending final staged list.
 
 ### Decisions Made
 
-- Do not commit the current dirty tree wholesale.
-- Do not start P0.3A or commit unverified AI logic.
-- Keep `release:check` failure status truthful since corpus QA and test data coverage are incomplete in the local testbed.
+- Keep `.env.test` safe and tracked instead of copying real local env files.
+- Keep strict env validation active in tests, build, and production.
+- Use safe placeholder env exports for local `next build` verification because
+  Next production builds do not load `.env.test` automatically.
 
 ### Tests Run
 
-- `npm run secrets:check`: passed.
-- `npm run format:check`: passed (after fix).
+- `npm run test -- src/lib/auth/current-actor.test.ts tests/lib/auth/get-authenticated-user.test.ts src/app/actions/logout.test.ts src/app/api/auth/supabase/callback/route.test.ts tests/supabase-security.test.ts src/lib/providers/providers.test.ts`:
+  passed, 6 files / 53 tests.
+- `npm run test -- src/app/api/events/route.test.ts src/app/api/auth/supabase/callback/route.test.ts tests/supabase-security.test.ts tests/lib/auth/get-authenticated-user.test.ts src/lib/auth/current-actor.test.ts`:
+  passed, 5 files / 53 tests.
+- `npm run format:check`: passed.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
-- `npm run test`: passed, 46 files / 217 tests.
-- `npm run build`: passed.
-- `npm run db:ready`: passed.
-- `npm run scripture:validate`: passed.
-- `npm run release:check`: Truthfully failed since Voice QA coverage and eval artifacts are not ready, preserving the blocking behavior.
+- `npm run test`: passed, 52 files / 270 tests.
+- `npm audit --audit-level=high`: passed; low/moderate advisories remain.
+- `npm run secrets:check`: passed.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
+- `git diff --check`: passed.
+- `set -a; source .env.test; set +a; npm run build`: passed.
 
 ### Checks Passed
 
-- P0.1/P0.2 Schema and CI updates were successfully validated via local CI steps and safely committed.
-- Secret checks and linting pass.
+- No executable environment-validation bypass remains.
+- Full suite passes without the bypass.
+- Safe placeholder env supports tests and build verification.
+- Secret containment still passes with tracked `.env.test` allowed and scanned.
 
 ### Checks Failed
 
-- `release:check` failed, preventing a false sense of release readiness, as mandated.
+- `npm run build` without any environment failed because strict env validation
+  requires `AUTH_SECRET` and `DATABASE_URL`; `.env.test` is not loaded by Next
+  production builds.
+- `set -a; source .env.test; set +a; npx prisma migrate status` failed with
+  `Error: Schema engine error:` because no local Postgres test database is
+  serving at `localhost:5432`.
 
 ### Remaining Blockers
 
-- Manual external secret rotation (AUTH_SECRET, local STT token, db passwords) must be performed by the repository owner.
-- Documenting local Ollama config.
-- P0.2 provider dependencies are still pending integration in subsequent phases.
+- Final staging/commit still pending.
+- If strict local `npm run build` with no shell env is required, the environment
+  must provide safe build-time values or real deployment values without using a
+  validation bypass.
 
 ### Recommended Next Task
 
-- Proceed with P0.2 provider integrations (once unblocked) and maintainer manual actions. Do not proceed to P0.3A.
+- Stage explicit P0.3B.1 files only, rerun final diff/status checks, commit on
+  `codex/p0-3b-1-auth-certification`, then open or push according to release
+  workflow.

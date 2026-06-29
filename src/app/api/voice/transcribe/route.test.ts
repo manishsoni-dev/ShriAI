@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  getAuthenticatedUser: vi.fn(),
   checkRateLimit: vi.fn(),
   logObservabilityEvent: vi.fn(),
   userFindUnique: vi.fn(),
@@ -13,7 +13,9 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/auth", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/auth/get-authenticated-user", () => ({
+  getAuthenticatedUser: mocks.getAuthenticatedUser,
+}));
 vi.mock("@/env", () => ({ env: mocks.env }));
 vi.mock("@/lib/db", () => ({
   db: {
@@ -52,7 +54,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.env.STT_TIMEOUT_MS = 100;
   vi.stubGlobal("fetch", vi.fn());
-  mocks.auth.mockResolvedValue({ user: { id: "user-owner" } });
+  mocks.getAuthenticatedUser.mockResolvedValue({ user: { id: "user-owner" } });
   mocks.userFindUnique.mockResolvedValue({
     microphoneConsentGivenAt: new Date("2026-06-22T00:00:00.000Z"),
   });
@@ -61,7 +63,7 @@ beforeEach(() => {
 
 describe("POST /api/voice/transcribe", () => {
   it("requires authentication", async () => {
-    mocks.auth.mockResolvedValueOnce(null);
+    mocks.getAuthenticatedUser.mockResolvedValueOnce(null);
     const response = await POST(requestWithAudio());
     expect(response.status).toBe(401);
     expect(mocks.userFindUnique).not.toHaveBeenCalled();

@@ -6,8 +6,22 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { signIn } from "@/auth";
-import { createCredentialsUser, DuplicateEmailError } from "@/lib/auth/users";
+import { db } from "@/lib/db";
+import { env } from "@/env";
+import {
+  createCredentialsUser,
+  DuplicateEmailError,
+  InvalidCredentialsError,
+  normalizeEmail,
+  normalizeName,
+  verifyBetaAccess,
+} from "@/lib/auth/users";
 import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  isNewAccountEnabled,
+  isLinkedSigninEnabled,
+} from "@/lib/supabase/rollout";
+import { createServerClient } from "@/lib/supabase/server";
 
 // 5 attempts per 15-minute window per unique key (email + IP)
 const SIGN_IN_LIMIT = 5;
@@ -131,20 +145,48 @@ export async function authenticate(
 
   try {
     if (isRegistering) {
-      await createCredentialsUser({
-        email: parsed.data.email,
-        name: parsed.data.name,
-        password: parsed.data.password,
-      });
+      if (isNewAccountEnabled()) {
+        await supabaseRegister({
+          email: parsed.data.email,
+          password: parsed.data.password,
+          name: parsed.data.name,
+        });
+        return {
+          message:
+            "Registration received. Please check your email to confirm your account.",
+          email: emailStr,
+          mode,
+          name,
+        };
+      } else {
+        await createCredentialsUser({
+          email: parsed.data.email,
+          name: parsed.data.name,
+          password: parsed.data.password,
+        });
+      }
     }
 
-    await signIn("credentials", {
-      email: parsed.data.email,
-      password: parsed.data.password,
-      redirectTo,
-    });
+    if (isLinkedSigninEnabled()) {
+      await supabaseSignIn({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      });
+      // If supabaseSignIn returns, it means success.
+      // It will redirect at the bottom of the try/catch.
+    } else {
+      await signIn("credentials", {
+        email: parsed.data.email,
+        password: parsed.data.password,
+        redirectTo,
+      });
+    }
   } catch (error) {
-    if (error instanceof AuthError || error instanceof DuplicateEmailError) {
+    if (
+      error instanceof AuthError ||
+      error instanceof DuplicateEmailError ||
+      error instanceof InvalidCredentialsError
+    ) {
       return {
         message:
           mode === "register"
@@ -161,4 +203,73 @@ export async function authenticate(
   }
 
   redirect(redirectTo);
+}
+
+async function supabaseRegister(input: {
+  email: string;
+  password: string;
+  name?: string;
+}) {
+  const email = normalizeEmail(input.email);
+  await verifyBetaAccess(email);
+
+  const existingUser = await db.user.findUnique({
+    where: { email },
+    select: { id: true, supabaseAuthUserId: true },
+  });
+
+  // Check for legacy-account collision. Do not auto-link and do not create parallel usable account.
+  if (existingUser && !existingUser.supabaseAuthUserId) {
+    return; // Pretend success to preserve generic messages.
+  }
+
+  const { client } = await createServerClient();
+  if (!client) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const emailRedirectTo = `${env.NEXT_PUBLIC_SITE_URL}/api/auth/supabase/callback`;
+
+  // Use the Supabase SSR server client for signup
+  await client.auth.signUp({
+    email,
+    password: input.password,
+    options: {
+      emailRedirectTo,
+      data: {
+        name: normalizeName(input.name),
+      },
+    },
+  });
+
+  // We preserve generic user-facing messages that do not reveal whether an email already exists.
+  // AuthApiError with status 422 for already registered users will be ignored here.
+}
+
+async function supabaseSignIn(input: { email: string; password: string }) {
+  const email = normalizeEmail(input.email);
+
+  const { client } = await createServerClient();
+  if (!client) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password: input.password,
+  });
+
+  if (error || !data.user) {
+    throw new InvalidCredentialsError();
+  }
+
+  // After successful credential validation, resolve the authenticated subject.
+  const { getCurrentActor } = await import("@/lib/auth/current-actor");
+  const { actor } = await getCurrentActor();
+
+  if (!actor) {
+    // Valid but unlinked Supabase account must be denied and signed out
+    await client.auth.signOut();
+    throw new InvalidCredentialsError();
+  }
 }

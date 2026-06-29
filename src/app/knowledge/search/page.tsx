@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { db } from "@/lib/db";
 import { semanticSearch } from "@/lib/knowledge-search";
 import { ensureDefaultWorkspace } from "@/lib/workspaces";

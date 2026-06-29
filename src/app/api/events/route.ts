@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { logProductEvent, type ProductEventType } from "@/lib/product-events";
 
 // List of event types allowed to be sent from the client
