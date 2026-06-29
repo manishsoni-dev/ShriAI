@@ -32,15 +32,18 @@ Ollama is unavailable.
 
 ## Supabase Auth Migration Plan
 
-P0.2 introduces only a nullable unique `User.authUserId` mapping. It does not
-activate Supabase Auth and does not create dual-auth production behavior.
+P0.2 introduces only a nullable unique `User.supabaseAuthUserId` UUID mapping.
+It does not activate Supabase Auth and does not create dual-auth production
+behavior. If an earlier local draft introduced a generic `authUserId` text
+column, the corrective migration removes it and preserves only valid UUID-shaped
+values in `supabaseAuthUserId`.
 
 Migration stages:
 
-1. Add nullable unique `User.authUserId`.
+1. Add nullable unique `User.supabaseAuthUserId`.
 2. Keep Auth.js credentials as the only active sign-in path.
 3. Export a reviewed mapping plan from current users to Supabase Auth users.
-4. Backfill `authUserId` in a controlled script after Supabase users exist.
+4. Backfill `supabaseAuthUserId` in a controlled script after Supabase users exist.
 5. Verify every active user has exactly one Supabase Auth mapping.
 6. Update session/auth reads to resolve the Supabase Auth user to the existing
    CUID `User.id` before touching owned data.

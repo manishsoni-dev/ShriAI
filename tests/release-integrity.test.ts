@@ -62,6 +62,12 @@ describe("release integrity configuration", () => {
     );
     expect(createArchive).toContain('git(["status", "--porcelain"])');
     expect(createArchive).toContain('"archive"');
+    expect(createArchive).toContain("archiveExcludePathspecs");
+    expect(createArchive).toContain('".env*"');
+    expect(createArchive).toContain('"data/evals/**"');
+    expect(createArchive).toContain('"uploads/**"');
+    expect(createArchive).toContain('".next/**"');
+    expect(createArchive).toContain('"test-results/**"');
     expect(createArchive).toContain("verifySourceArchive");
   });
 
