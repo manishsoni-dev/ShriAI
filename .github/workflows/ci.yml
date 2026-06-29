@@ -15,7 +15,7 @@ jobs:
         env:
           POSTGRES_USER: manishh
           POSTGRES_PASSWORD: password
-          POSTGRES_DB: shri_ai
+          POSTGRES_DB: shri_ai_ci
         ports:
           - 5432:5432
         options: >-
@@ -26,7 +26,8 @@ jobs:
 
     env:
       AUTH_SECRET: "ci-only-placeholder-auth-secret-at-least-32-chars"
-      DATABASE_URL: "postgresql://manishh:password@localhost:5432/shri_ai?schema=public"
+      DATABASE_URL: "postgresql://manishh:password@localhost:5432/shri_ai_ci?schema=public"
+      TEST_DATABASE_URL: "postgresql://manishh:password@localhost:5432/shri_ai_ci?schema=public"
 
     steps:
       - uses: actions/checkout@v6
@@ -52,6 +53,9 @@ jobs:
       - name: Validate Prisma Schema
         run: npx prisma validate
 
+      - name: Test Database URL Preflight
+        run: npm run test:db:preflight
+
       - name: Apply Migrations
         run: npx prisma migrate deploy
 
@@ -65,10 +69,10 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npm run test
+        run: npm run test:ci
 
       - name: Build
-        run: npm run build
+        run: npm run build:ci
 
       - name: DB Readiness Check
         run: npm run db:ready

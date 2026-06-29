@@ -1,193 +1,206 @@
-# Current Task: Clean Integration and Migration Correction
+# Current Task: P0.3B.2 - Integration Recovery and Staging Certification
 
 ## Objective
 
-Cleanly integrate the existing P0.1 and P0.2 work without committing the entire
-dirty worktree. First preserve the secret-rotation requirement as an explicit
-manual maintainer action, then inventory and isolate P0.1, rebase/correct P0.2,
-add hosted Caddy validation, create a verified safe source archive only from a
-clean committed tree, and leave P0.3A gated until all required conditions are
-true.
+Create a fresh isolated P0.3B.2 branch from `origin/main`, integrate only the
+controlled Supabase Auth staging work from P0.3B/P0.3B.1, add deterministic
+CI/test environment commands and test database safety, and document staging
+certification without starting P0.3C.
 
 ## Verified Current Flow
 
-- Manual secret rotation is required before public sharing, but it cannot be
-  performed by this local agent without the actual external account credentials
-  and account-owner actions:
-  - rotate `AUTH_SECRET`;
-  - rotate database password/connection credentials;
-  - rotate local STT token;
-  - rotate any third-party credentials later added;
-  - remove old ZIP copies from Drive, GitHub releases, chat uploads, and local
-    shared folders.
-- Required inventory commands were run:
-  - `git status --short`: broad dirty tree with tracked modifications and many
-    untracked files.
-  - `git diff --name-only`: 58 tracked modified files.
-  - `git diff --stat`: 58 tracked files, 2749 insertions, 1252 deletions.
-  - `git diff --check`: passed.
-  - `git ls-files -- .env .env.local .env.production .env.development`: no
-    tracked env files.
-  - `git log --all -- .env .env.local .env.production .env.development`: no
-    local history for those env files.
-- Branch state:
-  - current branch: `codex/p0-2-managed-services-foundation`;
-  - local `codex/p0-1-release-integrity` and `codex/p0-2-managed-services-foundation`
-    both point at `ce434da`;
-  - `main` points at `864dc69`;
-  - remote `origin/main` points at `864dc69`;
-  - remote `origin/p0-trust-hardening` exists at `3c61e14`.
-- Existing CI currently has one `build-and-test` job in
-  `.github/workflows/ci.yml`; it does not yet include a Caddy validation job.
-- The current dirty tree includes previous P0.1/P0.2 work and unrelated WIP, so
-  `git add -A`, `git commit -am`, or a whole-tree merge would be incorrect.
+- Fresh worktree: `/Users/manishh/Desktop/Shri AI P0.3B.2`.
+- Branch: `codex/p0-3b-2-integration-staging-certification`.
+- Branch base: `origin/main` at `4786bbd`.
+- Initial worktree state: `git status --short` clean.
+- Initial branch log starts at `4786bbd Merge branch 'codex/p0-baseline-verify' into main`.
+- Initial diff: `git diff --stat` and `git diff` have no output.
+- Preflight from the original P0.3B.1 worktree verified:
+  - `git fetch origin --prune`: passed.
+  - `git worktree list`: existing worktrees are Shri AI P0.3B.1, P0.1 Clean,
+    P0.2 Clean, P0.3A, and baseline main.
+  - `git branch -a --contains 23dd098`: only local/remote
+    `codex/p0-3b-1-auth-certification`.
+  - `git cat-file -e 23dd098^{commit}`: passed.
+  - `git merge-base origin/main 23dd098`: `4786bbd`.
+  - `git log --oneline origin/main..23dd098`: P0.3A, P0.3B.1, plus an
+    out-of-scope source-archive commit and its revert.
+  - `git diff --name-status origin/main...23dd098`: P0.3 auth/staging files
+    only in net diff; no source-archive files remain in the net diff.
+  - `git show --stat 23dd098`: five-file certification test/doc delta.
+  - Original P0.3B.1 worktree `git status --short`: clean.
+- Interrupted P0.1 worktree preservation status:
+  `/Users/manishh/Desktop/Shri AI P0.1 Clean` has staged
+  `docs/development/CURRENT_TASK.md` after a rebase continuation. It is
+  unrelated to P0.3B.2 and will not be modified by this task.
 
 ## Scope
 
-- Inventory and classify the dirty worktree.
-- Build an isolated P0.1 branch/commit from a clean baseline, including only:
-  release integrity, audit remediation, archive safety, Voice QA integrity, CI
-  split, evaluation fail-fast behavior, and Caddy test/docs.
-- Exclude runtime files, generated outputs, unrelated WIP, P0.2 provider work,
-  and mutable `CURRENT_TASK.md` churn from the P0.1 commit.
-- After P0.1 isolation, prepare P0.2 on top of P0.1 with provider boundaries,
-  configuration, redaction, health states, event contracts, architecture docs,
-  and a corrective migration from generic `authUserId` to
-  `supabaseAuthUserId UUID`.
-- Add hosted CI Caddy validation using the same pinned Caddy container image as
-  deployment.
-- Create and verify a safe source archive only from a clean committed tree.
+- Integrate controlled Supabase Auth staging foundation and certification
+  changes required for P0.3B/P0.3B.1.
+- Deterministic safe CI/test commands using tracked `.env.test` placeholders
+  only for explicit non-production validation commands.
+- Test database safety preflight and documentation.
+- P0.3B.2 integration report, research decision log, and staging checklist.
+- GitHub Actions updates for deterministic CI commands.
 
 ## Out-Of-Scope Work
 
-- Do not start P0.3A.
-- Do not activate Supabase Auth.
-- Do not merge or commit the entire dirty worktree.
-- Do not use `git add -A` or `git commit -am`.
-- Do not commit runtime artifacts, generated eval output, local env files,
-  uploads, logs, databases, `.next`, `node_modules`, or mutable task-status
-  churn.
-- Do not use Replit unless a concrete import/deploy/environment task is added.
+- No P0.3C.
+- No Resend API email sending, Inngest jobs, Pinecone queries, PostHog capture,
+  Sentry capture, hosted LLMs, or product features.
+- No unrelated P0.1 rebase, source archive, Caddy, UI, cosmic, or script WIP
+  unless already present in `origin/main`.
+- No mutation or deletion of the original or interrupted worktrees.
+- No history rewriting or force-push.
+- No copying, reading, printing, or committing real `.env` or `.env.local`.
 
 ## Decisions
 
-- Treat current worktree and external state as authoritative.
-- Preserve unrelated WIP by isolating patches from a clean baseline rather than
-  reverting the dirty working tree.
-- Keep manual secret rotation as a maintainer action and continue repo-local
-  cleanup progress.
-- The eventual P0.1 PR must be built from a clean branch and reviewed file by
-  file.
+- Use the fresh worktree as the only implementation location.
+- Treat current Git state and GitHub state as authoritative.
+- Inspect net P0.3B.1 diff and ancestry before applying any code.
+- Keep `npm run build` as the production build command requiring real
+  configuration; add explicit CI/test commands for placeholder-based validation.
+- Do not silently create local PostgreSQL roles or databases.
 
 ## Acceptance Criteria
 
-- Dirty worktree is classified by scope.
-- P0.1 exists as a clean scoped commit/PR without unrelated files.
-- P0.2 is rebased on merged P0.1 and contains the migration correction.
-- Hosted CI validates the Caddyfile using the pinned deployment Caddy image.
-- A fresh safe source archive is generated and verified from a clean committed
-  tree.
-- P0.3A remains blocked until all listed gates pass.
+- Branch is created from current `origin/main`.
+- Integrated diff excludes the out-of-scope source archive/Caddy rebase work.
+- `SKIP_ENV_VALIDATION` is absent.
+- `.env.test` contains only safe placeholders required by `src/env.ts`.
+- `npm run test:ci` and `npm run build:ci` load `.env.test` placeholders without
+  overriding existing CI-provided environment variables.
+- Database integration tests require explicit `TEST_DATABASE_URL` and reject
+  production-like targets.
+- Staging checklist requires evidence and does not claim manual checks passed.
+- Required validation commands pass or safe prerequisites are reported.
 
 ## Files Expected To Change
 
+- `.env.test`
+- `.github/workflows/ci.yml`
+- `.gitignore`
 - `docs/development/CURRENT_TASK.md`
-- Clean P0.1 branch files only after classification.
-- Clean P0.2 branch files only after P0.1 isolation.
+- `docs/development/P0_3B_2_INTEGRATION.md`
+- `docs/research/SHRI_AI_DECISION_LOG.md`
+- `docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md`
+- `package.json`
+- P0.3B/P0.3B.1 auth, Supabase, route, test, and documentation files after
+  reviewed integration.
 
 ## Files That Must Remain Unchanged
 
-- Real local `.env*` files, databases, logs, uploads, and local model data.
-- Unrelated UI/product WIP unless specifically classified into P0.1 or P0.2.
+- Real `.env`, `.env.local`, `.env.production`, and `.env.development` files.
+- Interrupted P0.1/P0.2/P0.3A worktrees outside this fresh P0.3B.2 worktree.
+- Source archive, Caddy, UI/cosmic, generated runtime, upload, log, database, or
+  build artifacts unless already in `origin/main`.
 
 ## Tests Required
 
-- P0.1 branch:
-  - `npm run secrets:check`
-  - `npm run format:check`
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run test`
-  - `npm run build`
-  - `npm audit --audit-level=high`
-  - `npm run prisma:generate`
-  - `npx prisma validate`
-  - `git diff --check`
-  - hosted Caddy validation in CI
-- Later final gate before P0.3A:
-  - all commands listed in the objective must pass from a clean worktree.
+- Auth arbitration and route certification tests.
+- Client/server Supabase boundary tests.
+- CI env placeholder loading tests.
+- Test database safety preflight tests.
+- Staging checklist/docs static tests where applicable.
+- Full required validation command set.
 
 ## Verification Commands
 
 ```bash
-git status --short
-git diff --name-only
-git diff --stat
+npm run secrets:check
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run test:ci
+npm run build:ci
+npm audit --audit-level=high
+npm run prisma:generate
+npx prisma validate
 git diff --check
-git ls-files -- .env .env.local .env.production .env.development
-git log --all -- .env .env.local .env.production .env.development
+git status --short
 ```
+
+Database integration checks must run only with an explicit disposable
+`TEST_DATABASE_URL`.
 
 ## Implementation Log
 
 ### What Was Implemented
 
-- Inventory and classification of dirty worktree completed.
-- P0.1 / P0.2 separation documented.
-- Added hosted CI Caddy validation using the same pinned Caddy container image (`caddy:2-alpine`) as deployment in `.github/workflows/ci.yml`.
-- Updated `scripts/verify-source-archive.mjs` to properly exclude eval artifacts (`data/evals`).
-- Verified `scripts/check-local-ai-readiness.ts` and `scripts/evaluate-scripture-retrieval.ts` fail fast safely with proper error codes and preservation of existing artifact state.
-- Checked `Caddyfile` and `tests/release-integrity.test.ts` to ensure `Permissions-Policy: microphone=(self)` remains enforced and CI configurations are pinned.
-- Committed Group 1 files (`prisma/schema.prisma`, `prisma/migrations/`, `src/lib/auth/users.ts`, `src/lib/auth/users.test.ts`, `scripts/create-source-archive.mjs`, `scripts/verify-source-archive.mjs`, `tests/release-integrity.test.ts`, `docs/development/BASELINE_RECONCILIATION.md`, `.github/workflows/ci.yml`) to `codex/p0-2-1-baseline-reconciliation`.
-- Ran automated validation gates (`secrets:check`, `format`, `lint`, `typecheck`, `test`, `build`, `db:ready`, `scripture:validate`, `release:check`).
+- Created the fresh isolated P0.3B.2 worktree and branch from `origin/main`.
+- Recorded mandatory preflight evidence and task scope.
+- Integrated the net P0.3A/P0.3B.1 controlled Supabase Auth staging diff while
+  excluding the old task-document churn and the reverted source-archive history.
+- Added deterministic `test:ci` and `build:ci` commands using `.env.test`
+  placeholders without overriding CI-provided environment variables.
+- Added explicit test database URL preflight checks and tests.
+- Added the P0.3B.2 integration report, research decision log, and final manual
+  staging evidence checklist.
 
 ### Files Changed
 
-- `.github/workflows/ci.yml`
 - `docs/development/CURRENT_TASK.md`
-- `prisma/migrations/20260628173000_add_supabase_auth_mapping/migration.sql`
-- `prisma/migrations/20260628180000_correct_supabase_auth_mapping/migration.sql`
-- `prisma/schema.prisma`
-- `scripts/create-source-archive.mjs`
-- `scripts/verify-source-archive.mjs`
-- `src/lib/auth/users.test.ts`
-- `src/lib/auth/users.ts`
-- `tests/release-integrity.test.ts`
-- `docs/development/BASELINE_RECONCILIATION.md`
+- Auth/Supabase staging files listed in
+  `docs/development/P0_3B_2_INTEGRATION.md`.
+- `.github/workflows/ci.yml`
+- `package.json`
+- `scripts/run-with-test-env.mjs`
+- `scripts/check-test-database-url.mjs`
+- `tests/ci-env-contract.test.ts`
+- `tests/test-database-url.test.mjs`
+- `docs/development/P0_3B_2_INTEGRATION.md`
+- `docs/research/SHRI_AI_DECISION_LOG.md`
+- `docs/security/SUPABASE_AUTH_STAGING_CUTOVER.md`
 
 ### Decisions Made
 
-- Do not commit the current dirty tree wholesale.
-- Do not start P0.3A or commit unverified AI logic.
-- Keep `release:check` failure status truthful since corpus QA and test data coverage are incomplete in the local testbed.
+- Leave the interrupted P0.1 clean worktree untouched and document it as
+  unrelated preserved worktree state.
+- Keep `npm run build` as the production build command; use `build:ci` only for
+  placeholder-backed validation.
+- Require `TEST_DATABASE_URL` for database integration checks and reject
+  production-like or ambiguous database targets.
 
 ### Tests Run
 
 - `npm run secrets:check`: passed.
-- `npm run format:check`: passed (after fix).
+- `npm run format:check`: passed.
 - `npm run lint`: passed.
 - `npm run typecheck`: passed.
-- `npm run test`: passed, 46 files / 217 tests.
-- `npm run build`: passed.
-- `npm run db:ready`: passed.
-- `npm run scripture:validate`: passed.
-- `npm run release:check`: Truthfully failed since Voice QA coverage and eval artifacts are not ready, preserving the blocking behavior.
+- `npm run test`: passed, 54 files / 278 tests.
+- `npm run test:ci`: passed, 54 files / 278 tests.
+- `npm run build:ci`: passed.
+- `npm audit --audit-level=high`: passed with low/moderate advisories only.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
+- `git diff --check`: passed.
+- `npm run test:db:preflight`: failed safely without `TEST_DATABASE_URL`.
+- Explicit disposable `TEST_DATABASE_URL` preflight: passed.
 
 ### Checks Passed
 
-- P0.1/P0.2 Schema and CI updates were successfully validated via local CI steps and safely committed.
-- Secret checks and linting pass.
+- Fresh worktree creation and initial Git inspection passed.
+- Required local validation passed, except for the intentionally missing
+  `TEST_DATABASE_URL` prerequisite check.
 
 ### Checks Failed
 
-- `release:check` failed, preventing a false sense of release readiness, as mandated.
+- `npm run test:db:preflight` without `TEST_DATABASE_URL` failed by design to
+  prevent accidental database integration tests against production or ambiguous
+  databases.
 
 ### Remaining Blockers
 
-- Manual external secret rotation (AUTH_SECRET, local STT token, db passwords) must be performed by the repository owner.
-- Documenting local Ollama config.
-- P0.2 provider dependencies are still pending integration in subsequent phases.
+- Manual staging evidence is not supplied; staging checklist can be prepared but
+  cannot be marked passed.
+- P0.3C remains blocked until P0.3B.2 integration and staging certification are
+  complete and verified.
+- Database integration checks require an explicit disposable `TEST_DATABASE_URL`.
 
 ### Recommended Next Task
 
-- Proceed with P0.2 provider integrations (once unblocked) and maintainer manual actions. Do not proceed to P0.3A.
+- Inspect and integrate the P0.3B/P0.3B.1 net auth diff onto this branch,
+  excluding unrelated history.

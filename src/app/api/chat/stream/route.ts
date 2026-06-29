@@ -7,7 +7,7 @@ import { type AIMessage } from "@/lib/ai/types";
 
 import { NextResponse } from "next/server";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { AIError, getAIUserFacingMessage } from "@/lib/ai";
 import {
   ConversationAccessError,

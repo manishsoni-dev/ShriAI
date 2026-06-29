@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
 
   return {
     ConversationAccessError: MockConversationAccessError,
-    auth: vi.fn(),
+    getAuthenticatedUser: vi.fn(),
     userFindUnique: vi.fn(),
     checkRateLimit: vi.fn(),
     getConversation: vi.fn(),
@@ -32,8 +32,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("@/auth", () => ({
-  auth: mocks.auth,
+vi.mock("@/lib/auth/get-authenticated-user", () => ({
+  getAuthenticatedUser: mocks.getAuthenticatedUser,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -135,7 +135,7 @@ async function readEvents(response: Response) {
 beforeEach(() => {
   vi.clearAllMocks();
 
-  mocks.auth.mockResolvedValue({ user: { id: OWNER_ID } });
+  mocks.getAuthenticatedUser.mockResolvedValue({ user: { id: OWNER_ID } });
   mocks.userFindUnique.mockResolvedValue({
     id: OWNER_ID,
     email: "owner@example.com",
@@ -183,7 +183,7 @@ beforeEach(() => {
 
 describe("POST /api/chat/stream authorization", () => {
   it("returns 401 for unauthenticated access", async () => {
-    mocks.auth.mockResolvedValueOnce(null);
+    mocks.getAuthenticatedUser.mockResolvedValueOnce(null);
 
     const response = await POST(
       chatRequest({ conversationId: CONVERSATION_ID, message: "Hello" }),
@@ -236,7 +236,7 @@ describe("POST /api/chat/stream authorization", () => {
   });
 
   it("uses the authenticated user id and ignores client-supplied identity", async () => {
-    mocks.auth.mockResolvedValueOnce({ user: { id: PEER_ID } });
+    mocks.getAuthenticatedUser.mockResolvedValueOnce({ user: { id: PEER_ID } });
     mocks.userFindUnique.mockResolvedValueOnce({
       id: PEER_ID,
       email: "peer@example.com",

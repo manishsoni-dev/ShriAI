@@ -3,7 +3,7 @@ import "server-only";
 import { isIP } from "node:net";
 import { NextResponse } from "next/server";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { env } from "@/env";
 import { db } from "@/lib/db";
 import { logObservabilityEvent } from "@/lib/observability";

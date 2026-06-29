@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const allowedEnvFiles = new Set([".env.example"]);
+const allowedEnvFiles = new Set([".env.example", ".env.test"]);
 const skippedContentFiles = new Set([
   "package-lock.json",
   "data/evals/scripture-retrieval/runs/eval-run-baseline-v1-2026-06-23T13-31-58-775Z.json",
@@ -70,7 +70,7 @@ function isForbiddenEnvPath(file) {
 function shouldScanContent(file) {
   if (skippedContentFiles.has(file)) return false;
   const base = path.basename(file);
-  if (base === ".env.example") return true;
+  if (base === ".env.example" || base === ".env.test") return true;
   return textExtensions.has(path.extname(file));
 }
 
@@ -91,7 +91,7 @@ function envExampleHasUnsafeLiteral(text) {
       .replace(/^["']|["']$/g, "");
     if (!value) continue;
     if (
-      /replace-with|localhost|127\.0\.0\.1|postgres:postgres|qwen3|small|development|staging|true|false|^\d+$|^$/.test(
+      /replace-with|localhost|127\.0\.0\.1|postgres:postgres|postgres:\/\/test:test@localhost|shri_ai_test|test-secret|qwen3|small|development|staging|true|false|^\d+$|^$/.test(
         value,
       )
     ) {
@@ -122,7 +122,7 @@ for (const file of files) {
     continue;
   }
 
-  if (file === ".env.example") {
+  if (file === ".env.example" || file === ".env.test") {
     findings.push(...envExampleHasUnsafeLiteral(text));
   }
 
@@ -145,5 +145,5 @@ if (findings.length > 0) {
 }
 
 console.log(
-  "Secret containment check passed: no tracked env files or known secret patterns found.",
+  "Secret containment check passed: no tracked real env files or known secret patterns found.",
 );

@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  getAuthenticatedUser: vi.fn(),
   redirect: vi.fn((url: string) => {
     throw new Error(`NEXT_REDIRECT:${url}`);
   }),
@@ -17,8 +17,9 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
 }));
 
-vi.mock("@/auth", () => ({
-  auth: mocks.auth,
+vi.mock("@/auth", () => ({ auth: vi.fn(), signOut: vi.fn() }));
+vi.mock("@/lib/auth/get-authenticated-user", () => ({
+  getAuthenticatedUser: mocks.getAuthenticatedUser,
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -49,7 +50,7 @@ import DashboardPage from "./page";
 describe("DashboardPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ user: { id: "1" } });
+    mocks.getAuthenticatedUser.mockResolvedValue({ user: { id: "1" } });
     mocks.userFindUnique.mockResolvedValue({
       id: "1",
       email: "test@example.com",
@@ -69,12 +70,12 @@ describe("DashboardPage", () => {
   });
 
   it("redirects unauthenticated users", async () => {
-    mocks.auth.mockResolvedValueOnce(null);
+    mocks.getAuthenticatedUser.mockResolvedValueOnce(null);
     await expect(DashboardPage()).rejects.toThrow("NEXT_REDIRECT:/sign-in");
   });
 
   it("redirects if user not found in DB", async () => {
-    mocks.auth.mockResolvedValueOnce({ user: { id: "1" } });
+    mocks.getAuthenticatedUser.mockResolvedValueOnce({ user: { id: "1" } });
     mocks.userFindUnique.mockResolvedValueOnce(null);
     await expect(DashboardPage()).rejects.toThrow("NEXT_REDIRECT:/sign-in");
   });
@@ -149,7 +150,7 @@ describe("DashboardPage", () => {
     expect(reviewerMarkup).toContain("/admin/scripture-reviews");
 
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({ user: { id: "1" } });
+    mocks.getAuthenticatedUser.mockResolvedValue({ user: { id: "1" } });
     mocks.userFindUnique.mockResolvedValue({
       id: "1",
       email: "test@example.com",

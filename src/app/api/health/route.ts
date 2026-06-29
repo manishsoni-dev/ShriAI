@@ -11,6 +11,7 @@ import {
   getSentryProviderStatus,
   getSupabaseProviderStatus,
 } from "@/lib/providers";
+import { getRolloutHealth } from "@/lib/supabase/rollout";
 import type { ProviderAvailabilityCode } from "@/lib/providers/status";
 
 export const dynamic = "force-dynamic";
@@ -160,6 +161,8 @@ export async function GET() {
     resend: providerComponent(getResendProviderStatus()),
     inngest: providerComponent(getInngestProviderStatus()),
   };
+
+  const supabase_auth_rollout = getRolloutHealth();
   const status = hasFailure(components) ? "degraded" : "ok";
   const codes = Object.values(components)
     .map((component) => ("code" in component ? component.code : null))
@@ -181,6 +184,7 @@ export async function GET() {
         embedding: env.SHRI_AI_EMBEDDING_MODEL,
         stt: env.STT_MODEL,
       },
+      supabase_auth_rollout,
     },
     { status: status === "ok" ? 200 : 503 },
   );

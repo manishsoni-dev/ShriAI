@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-import { auth } from "@/auth";
+import { getAuthenticatedUser as auth } from "@/lib/auth/get-authenticated-user";
 import { signOutAction } from "@/app/dashboard/actions";
 import { isReviewerAuthorized } from "@/lib/auth/reviewer-authorization";
 import { listConversations } from "@/lib/conversations";
