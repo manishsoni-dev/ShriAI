@@ -1,193 +1,188 @@
-# Current Task: Clean Integration and Migration Correction
+# Current Task: P0.2 - Managed Services Foundation Clean Integration
 
 ## Objective
 
-Cleanly integrate the existing P0.1 and P0.2 work without committing the entire
-dirty worktree. First preserve the secret-rotation requirement as an explicit
-manual maintainer action, then inventory and isolate P0.1, rebase/correct P0.2,
-add hosted Caddy validation, create a verified safe source archive only from a
-clean committed tree, and leave P0.3A gated until all required conditions are
-true.
+Advance the clean-integration goal by preparing P0.2 as a narrow branch on top
+of merged P0.1. P0.2 must remain limited to managed-service boundaries and the
+Supabase Auth identity-mapping migration correction; it must not activate
+Supabase Auth or any external managed runtime service.
 
 ## Verified Current Flow
 
-- Manual secret rotation is required before public sharing, but it cannot be
-  performed by this local agent without the actual external account credentials
-  and account-owner actions:
-  - rotate `AUTH_SECRET`;
-  - rotate database password/connection credentials;
-  - rotate local STT token;
-  - rotate any third-party credentials later added;
-  - remove old ZIP copies from Drive, GitHub releases, chat uploads, and local
-    shared folders.
-- Required inventory commands were run:
-  - `git status --short`: broad dirty tree with tracked modifications and many
-    untracked files.
-  - `git diff --name-only`: 58 tracked modified files.
-  - `git diff --stat`: 58 tracked files, 2749 insertions, 1252 deletions.
+- Worktree: `/Users/manishh/Desktop/Shri AI P0.2 Clean`.
+- Branch: `codex/p0-2-managed-services-foundation-clean`.
+- Current branch head before this task-ledger update:
+  `d02981c chore: prepare managed service boundaries`.
+- Current base: `origin/main` at `cbade94 Merge P0.1 release integrity
+hardening`.
+- `git status --short`: clean before this task-ledger update.
+- `git diff --name-status origin/main...HEAD` contains only:
+  - `M docs/architecture/MANAGED_SERVICES_BOUNDARY.md`
+  - `A prisma/migrations/20260628183000_supabase_auth_uuid_mapping/migration.sql`
+- `git diff --stat origin/main...HEAD`: 2 files changed, 37 insertions, 4
+  deletions.
+- `git ls-remote --heads origin codex/p0-2-managed-services-foundation-clean`:
+  no remote branch existed before push.
+- Original root worktree inventory remained clean when this continuation
+  started:
+  - `git status --short`: no output.
+  - `git diff --name-only`: no output.
+  - `git diff --stat`: no output.
   - `git diff --check`: passed.
   - `git ls-files -- .env .env.local .env.production .env.development`: no
-    tracked env files.
+    tracked real env files.
   - `git log --all -- .env .env.local .env.production .env.development`: no
-    local history for those env files.
-- Branch state:
-  - current branch: `codex/p0-2-managed-services-foundation`;
-  - local `codex/p0-1-release-integrity` and `codex/p0-2-managed-services-foundation`
-    both point at `ce434da`;
-  - `main` points at `864dc69`;
-  - remote `origin/main` points at `864dc69`;
-  - remote `origin/p0-trust-hardening` exists at `3c61e14`.
-- Existing CI currently has one `build-and-test` job in
-  `.github/workflows/ci.yml`; it does not yet include a Caddy validation job.
-- The current dirty tree includes previous P0.1/P0.2 work and unrelated WIP, so
-  `git add -A`, `git commit -am`, or a whole-tree merge would be incorrect.
+    output.
+- GitHub state before P0.2 PR work:
+  - P0.1 is merged into `origin/main`.
+  - P0.3B.2 PR #4 is open and green but is later than the P0.2 gate.
+  - P0.3B.1 PR #3 is superseded by P0.3B.2.
+  - unrelated PR #1 remains dirty and out of scope.
 
 ## Scope
 
-- Inventory and classify the dirty worktree.
-- Build an isolated P0.1 branch/commit from a clean baseline, including only:
-  release integrity, audit remediation, archive safety, Voice QA integrity, CI
-  split, evaluation fail-fast behavior, and Caddy test/docs.
-- Exclude runtime files, generated outputs, unrelated WIP, P0.2 provider work,
-  and mutable `CURRENT_TASK.md` churn from the P0.1 commit.
-- After P0.1 isolation, prepare P0.2 on top of P0.1 with provider boundaries,
-  configuration, redaction, health states, event contracts, architecture docs,
-  and a corrective migration from generic `authUserId` to
-  `supabaseAuthUserId UUID`.
-- Add hosted CI Caddy validation using the same pinned Caddy container image as
-  deployment.
-- Create and verify a safe source archive only from a clean committed tree.
+- Keep P0.2 limited to managed-service provider boundaries, security
+  architecture documentation, and the corrected future Supabase Auth mapping
+  migration.
+- Add `User.supabaseAuthUserId` as a nullable UUID mapping for future Supabase
+  Auth migration.
+- Preserve current `User.id` CUID primary keys and all existing ownership
+  relationships.
+- If an earlier local draft created generic text `authUserId`, migrate only
+  UUID-shaped values into `supabaseAuthUserId` and remove the generic column.
+- Update this task ledger as required by repository instructions.
+- Push the clean branch and open a draft PR for CI validation.
 
 ## Out-Of-Scope Work
 
-- Do not start P0.3A.
 - Do not activate Supabase Auth.
-- Do not merge or commit the entire dirty worktree.
-- Do not use `git add -A` or `git commit -am`.
-- Do not commit runtime artifacts, generated eval output, local env files,
-  uploads, logs, databases, `.next`, `node_modules`, or mutable task-status
-  churn.
+- Do not start P0.3A or P0.3C.
+- Do not add Resend API email sending, Inngest jobs, Pinecone queries, PostHog
+  capture, Sentry capture, hosted LLMs, or product features.
+- Do not modify P0.3B.1/P0.3B.2 branches.
+- Do not commit runtime files, generated files, source archives, real `.env*`
+  files, uploads, logs, databases, `.next`, or `node_modules`.
+- Do not use `git add -A`, `git commit -am`, rebase an open remote branch, or
+  force-push.
 - Do not use Replit unless a concrete import/deploy/environment task is added.
 
 ## Decisions
 
-- Treat current worktree and external state as authoritative.
-- Preserve unrelated WIP by isolating patches from a clean baseline rather than
-  reverting the dirty working tree.
-- Keep manual secret rotation as a maintainer action and continue repo-local
-  cleanup progress.
-- The eventual P0.1 PR must be built from a clean branch and reviewed file by
-  file.
+- Treat `origin/main` and current local worktree state as authoritative.
+- Preserve P0.2 as a separate gate before any Supabase Auth foundation work.
+- Use a normal scoped commit for this task-ledger update and push the branch
+  without history rewriting.
+- Keep the migration defensive for prior local draft state by checking for
+  `authUserId` before migrating/dropping it.
 
 ## Acceptance Criteria
 
-- Dirty worktree is classified by scope.
-- P0.1 exists as a clean scoped commit/PR without unrelated files.
-- P0.2 is rebased on merged P0.1 and contains the migration correction.
-- Hosted CI validates the Caddyfile using the pinned deployment Caddy image.
-- A fresh safe source archive is generated and verified from a clean committed
-  tree.
-- P0.3A remains blocked until all listed gates pass.
+- P0.2 branch is based on merged P0.1.
+- Net branch diff remains limited to P0.2 managed-service boundary
+  documentation, the UUID migration correction, and required task ledger.
+- No real environment files are tracked or copied.
+- Supabase Auth remains inactive.
+- Validation commands pass locally.
+- Draft PR is opened and hosted CI validates the branch, including Caddy.
 
 ## Files Expected To Change
 
 - `docs/development/CURRENT_TASK.md`
-- Clean P0.1 branch files only after classification.
-- Clean P0.2 branch files only after P0.1 isolation.
+- `docs/architecture/MANAGED_SERVICES_BOUNDARY.md`
+- `prisma/migrations/20260628183000_supabase_auth_uuid_mapping/migration.sql`
 
 ## Files That Must Remain Unchanged
 
-- Real local `.env*` files, databases, logs, uploads, and local model data.
-- Unrelated UI/product WIP unless specifically classified into P0.1 or P0.2.
+- Real `.env`, `.env.local`, `.env.production`, and `.env.development` files.
+- P0.1, P0.3A, P0.3B.1, and P0.3B.2 worktrees.
+- Runtime artifacts, generated archives, logs, uploads, databases,
+  `node_modules`, and `.next`.
 
 ## Tests Required
 
-- P0.1 branch:
-  - `npm run secrets:check`
-  - `npm run format:check`
-  - `npm run lint`
-  - `npm run typecheck`
-  - `npm run test`
-  - `npm run build`
-  - `npm audit --audit-level=high`
-  - `npm run prisma:generate`
-  - `npx prisma validate`
-  - `git diff --check`
-  - hosted Caddy validation in CI
-- Later final gate before P0.3A:
-  - all commands listed in the objective must pass from a clean worktree.
+- Prisma migration and schema validation.
+- Full format, lint, typecheck, test, build, and audit checks.
+- Diff whitespace and clean-status checks.
+- Hosted CI after PR creation.
 
 ## Verification Commands
 
 ```bash
-git status --short
-git diff --name-only
-git diff --stat
+npm run secrets:check
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm audit --audit-level=high
+npm run prisma:generate
+npx prisma validate
 git diff --check
-git ls-files -- .env .env.local .env.production .env.development
-git log --all -- .env .env.local .env.production .env.development
+git status --short
 ```
 
 ## Implementation Log
 
 ### What Was Implemented
 
-- Inventory and classification of dirty worktree completed.
-- P0.1 / P0.2 separation documented.
-- Added hosted CI Caddy validation using the same pinned Caddy container image (`caddy:2-alpine`) as deployment in `.github/workflows/ci.yml`.
-- Updated `scripts/verify-source-archive.mjs` to properly exclude eval artifacts (`data/evals`).
-- Verified `scripts/check-local-ai-readiness.ts` and `scripts/evaluate-scripture-retrieval.ts` fail fast safely with proper error codes and preservation of existing artifact state.
-- Checked `Caddyfile` and `tests/release-integrity.test.ts` to ensure `Permissions-Policy: microphone=(self)` remains enforced and CI configurations are pinned.
-- Committed Group 1 files (`prisma/schema.prisma`, `prisma/migrations/`, `src/lib/auth/users.ts`, `src/lib/auth/users.test.ts`, `scripts/create-source-archive.mjs`, `scripts/verify-source-archive.mjs`, `tests/release-integrity.test.ts`, `docs/development/BASELINE_RECONCILIATION.md`, `.github/workflows/ci.yml`) to `codex/p0-2-1-baseline-reconciliation`.
-- Ran automated validation gates (`secrets:check`, `format`, `lint`, `typecheck`, `test`, `build`, `db:ready`, `scripture:validate`, `release:check`).
+- Verified the P0.2 clean worktree and net branch diff.
+- Confirmed no remote branch existed before push.
+- Replaced stale broad-cleanup task ledger with current P0.2 task state.
 
 ### Files Changed
 
-- `.github/workflows/ci.yml`
 - `docs/development/CURRENT_TASK.md`
-- `prisma/migrations/20260628173000_add_supabase_auth_mapping/migration.sql`
-- `prisma/migrations/20260628180000_correct_supabase_auth_mapping/migration.sql`
-- `prisma/schema.prisma`
-- `scripts/create-source-archive.mjs`
-- `scripts/verify-source-archive.mjs`
-- `src/lib/auth/users.test.ts`
-- `src/lib/auth/users.ts`
-- `tests/release-integrity.test.ts`
-- `docs/development/BASELINE_RECONCILIATION.md`
+- `docs/architecture/MANAGED_SERVICES_BOUNDARY.md`
+- `prisma/migrations/20260628183000_supabase_auth_uuid_mapping/migration.sql`
 
 ### Decisions Made
 
-- Do not commit the current dirty tree wholesale.
-- Do not start P0.3A or commit unverified AI logic.
-- Keep `release:check` failure status truthful since corpus QA and test data coverage are incomplete in the local testbed.
+- Keep P0.2 separate from P0.3B.2 even though P0.3B.2 is already green, because
+  the clean-integration goal gates P0.3 work on P0.2 first.
 
 ### Tests Run
 
 - `npm run secrets:check`: passed.
-- `npm run format:check`: passed (after fix).
+- `npm run format:check`: initially failed on this task ledger, then passed
+  after formatting.
 - `npm run lint`: passed.
+- `npm run prisma:generate`: passed.
+- `npx prisma validate`: passed.
 - `npm run typecheck`: passed.
-- `npm run test`: passed, 46 files / 217 tests.
-- `npm run build`: passed.
-- `npm run db:ready`: passed.
-- `npm run scripture:validate`: passed.
-- `npm run release:check`: Truthfully failed since Voice QA coverage and eval artifacts are not ready, preserving the blocking behavior.
+- `npm run test`: failed without `AUTH_SECRET` and `DATABASE_URL`, proving raw
+  local commands still require explicit safe env placeholders when no real env
+  files are used.
+- `AUTH_SECRET=local-placeholder-auth-secret-at-least-32-chars DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public npm run test`:
+  passed, 45 files / 212 tests.
+- `npm audit --audit-level=high`: passed with 1 low and 3 moderate advisories.
+- `npm run build`: failed without `AUTH_SECRET` and `DATABASE_URL` during page
+  data collection for `/api/auth/[...nextauth]`.
+- `AUTH_SECRET=local-placeholder-auth-secret-at-least-32-chars DATABASE_URL=postgresql://test:test@localhost:5432/shri_ai_test?schema=public npm run build`:
+  passed.
 
 ### Checks Passed
 
-- P0.1/P0.2 Schema and CI updates were successfully validated via local CI steps and safely committed.
-- Secret checks and linting pass.
+- Initial P0.2 worktree inspection passed.
+- P0.2 code and migration validation passed with safe placeholder env where
+  strict env validation requires it.
 
 ### Checks Failed
 
-- `release:check` failed, preventing a false sense of release readiness, as mandated.
+- Raw `npm run test` and raw `npm run build` fail without explicit safe
+  placeholders because this branch predates the later deterministic `.env.test`
+  CI command repair.
 
 ### Remaining Blockers
 
-- Manual external secret rotation (AUTH_SECRET, local STT token, db passwords) must be performed by the repository owner.
-- Documenting local Ollama config.
-- P0.2 provider dependencies are still pending integration in subsequent phases.
+- Manual external secret rotation remains maintainer-owned.
+- P0.2 branch still needs push, PR, hosted CI, and merge.
+- Safe source archive generation/verification must happen only after clean
+  commits and required gates are merged.
+- Final gate still requires raw `npm run test` and raw `npm run build` to pass
+  from a clean worktree without relying on real env files; this is not solved in
+  P0.2 and remains a later integration gate.
 
 ### Recommended Next Task
 
-- Proceed with P0.2 provider integrations (once unblocked) and maintainer manual actions. Do not proceed to P0.3A.
+- Run P0.2 validation, commit the task-ledger update, push the branch, and open
+  a draft PR.
