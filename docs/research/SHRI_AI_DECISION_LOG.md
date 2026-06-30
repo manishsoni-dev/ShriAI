@@ -104,3 +104,65 @@ managed-service work. Date checked: 2026-06-29.
 | Implementation phase | Future P0.3C                                                                                                                   |
 | Validation evidence  | P0.3B.2 does not activate Inngest jobs; future handler tests must prove idempotent replay.                                     |
 | Rollback condition   | Disable Inngest event emission and process notification outbox manually.                                                       |
+
+## D. P1.0A Cosmic Visual Fidelity
+
+| Field                | Entry                                                                                                                                                          |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source organization  | Next.js                                                                                                                                                        |
+| Source title         | Image Component and Image Optimization documentation                                                                                                           |
+| Source URL           | Local `node_modules/next/dist/docs/01-app/03-api-reference/02-components/image.md`; local `node_modules/next/dist/docs/01-app/01-getting-started/12-images.md` |
+| Date checked         | 2026-06-30                                                                                                                                                     |
+| Decision             | Enable `images.formats: ["image/avif", "image/webp"]`, keep explicit `sizes`, and remove `unoptimized` from first-viewport Shri mark images.                   |
+| Rationale            | The local Next 16 docs state responsive/fill images need `sizes`, and `formats` allows AVIF preference with WebP fallback through the image optimizer.         |
+| Implementation phase | P1.0A Cosmic Preservation and High-DPI Visual Fidelity                                                                                                         |
+| Validation evidence  | `next.config.ts`, `src/app/page.tsx`, `src/app/_components/devotional-shell.tsx`, `npm run build`, and viewport screenshots.                                   |
+| Rollback condition   | Revert `images.formats` and restore prior image delivery if production image optimization causes deployment-specific failures.                                 |
+
+| Field                | Entry                                                                                                                                           |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Source organization  | Shri AI                                                                                                                                         |
+| Source title         | Nine symbolic celestial-body integrity rule                                                                                                     |
+| Source URL           | Local product requirement and `docs/development/P1_0_HERO_CLARITY_COSMIC_CONTAINMENT.md`                                                        |
+| Date checked         | 2026-06-30                                                                                                                                      |
+| Decision             | Preserve the central sun and exactly nine symbolic celestial bodies; use "nine celestial bodies" language across code, tests, docs, and labels. |
+| Rationale            | The product requirement treats the cosmic system as symbolic and requires preserving all nine celestial bodies without collapsing the system.   |
+| Implementation phase | P1.0A Cosmic Preservation and High-DPI Visual Fidelity                                                                                          |
+| Validation evidence  | `src/lib/celestial-registry.ts`, `tests/cosmic-registry.test.ts`, `tests/cosmic-orbit.test.tsx`, and Playwright canvas count checks.            |
+| Rollback condition   | Revert the P1.0A branch if any body is removed or the central sun is no longer rendered.                                                        |
+
+| Field                | Entry                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source organization  | NASA and Wikimedia Commons                                                                                                                             |
+| Source title         | Linked celestial source pages and NASA media-usage guidance                                                                                            |
+| Source URL           | Registry source pages in `src/lib/celestial-registry.ts`; NASA Images and Media Guidelines at https://www.nasa.gov/nasa-brand-center/images-and-media/ |
+| Date checked         | 2026-06-30                                                                                                                                             |
+| Decision             | Keep current local assets only with source-linked review status; mark missing retained high-resolution originals as a blocker for any 4K claim.        |
+| Rationale            | The repo has linked source pages but not retained source originals, so redistribution and high-DPI claims require an explicit future source audit.     |
+| Implementation phase | P1.0A Cosmic Preservation and High-DPI Visual Fidelity                                                                                                 |
+| Validation evidence  | `docs/design/COSMIC_VISUAL_AUDIT.md`, `docs/architecture/COSMIC_ASSETS.md`, and registry provenance metadata.                                          |
+| Rollback condition   | Replace or remove any asset whose source page or NASA/Wikimedia status cannot be verified for project use.                                             |
+
+| Field                | Entry                                                                                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Source organization  | Shri AI                                                                                                                                          |
+| Source title         | Reduced-motion and pause behavior                                                                                                                |
+| Source URL           | Local accessibility requirement in P1.0A brief                                                                                                   |
+| Date checked         | 2026-06-30                                                                                                                                       |
+| Decision             | Stop orbital animation immediately when `prefers-reduced-motion` is enabled and expose a keyboard-accessible pause/resume motion control.        |
+| Rationale            | The cosmic layer is decorative; users who request reduced motion or manually pause motion should receive a stable centered composition.          |
+| Implementation phase | P1.0A Cosmic Preservation and High-DPI Visual Fidelity                                                                                           |
+| Validation evidence  | `src/app/_components/SharedCosmicBackground.tsx`, `src/app/_components/CosmicOrbitEngine.tsx`, unit tests, and Playwright reduced-motion checks. |
+| Rollback condition   | Hide the motion control and force reduced/static mode if the control creates usability or accessibility regressions.                             |
+
+| Field                | Entry                                                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Source organization  | Shri AI                                                                                                                   |
+| Source title         | Cosmic performance budgets                                                                                                |
+| Source URL           | Local P1.0A requirement and `docs/design/COSMIC_VISUAL_AUDIT.md`                                                          |
+| Date checked         | 2026-06-30                                                                                                                |
+| Decision             | Keep each non-critical celestial asset below 350 KB and keep initial hero visual payload target below 1.5 MB on desktop.  |
+| Rationale            | The cosmic system must remain decorative and performant, especially on mobile and low-power devices.                      |
+| Implementation phase | P1.0A Cosmic Preservation and High-DPI Visual Fidelity                                                                    |
+| Validation evidence  | `tests/cosmic-assets.test.ts`, asset byte counts in `docs/design/COSMIC_VISUAL_AUDIT.md`, and Playwright viewport checks. |
+| Rollback condition   | Revert new derivatives or reduce opacity/density further if payload or interaction budgets regress.                       |

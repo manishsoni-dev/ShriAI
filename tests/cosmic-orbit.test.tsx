@@ -6,6 +6,7 @@ import { CosmicOrbitEngine } from "../src/app/_components/CosmicOrbitEngine";
 import {
   CELESTIAL_BODIES,
   CELESTIAL_REGISTRY,
+  REQUIRED_CELESTIAL_BODY_COUNT,
 } from "../src/lib/celestial-registry";
 import fs from "fs";
 import path from "path";
@@ -29,6 +30,13 @@ HTMLCanvasElement.prototype.getContext = () => {
     stroke: () => {},
     drawImage: () => {},
     createRadialGradient: () => ({ addColorStop: () => {} }),
+    save: () => {},
+    restore: () => {},
+    set globalAlpha(_value: number) {},
+    set globalCompositeOperation(_value: string) {},
+    set fillStyle(_value: string | CanvasGradient) {},
+    set strokeStyle(_value: string | CanvasGradient) {},
+    set lineWidth(_value: number) {},
   } as any;
 };
 
@@ -69,34 +77,30 @@ describe("CosmicOrbitEngine", () => {
     expect(cancelAnimationFrameSpy).toHaveBeenCalledWith(123);
   });
 
-  it("has exactly nine orbiting bodies plus one sun", () => {
-    const planets = CELESTIAL_REGISTRY.filter(
-      (asset) => asset.classification === "planet",
+  it("has exactly nine celestial bodies plus one sun", () => {
+    const sun = CELESTIAL_REGISTRY.filter(
+      (asset) => asset.visualRole === "central-sun",
     );
-    const dwarf = CELESTIAL_REGISTRY.filter(
-      (asset) => asset.classification === "dwarf-planet",
-    );
-    const star = CELESTIAL_REGISTRY.filter(
-      (asset) => asset.classification === "star",
+    const bodies = CELESTIAL_REGISTRY.filter(
+      (asset) => asset.visualRole === "symbolic-celestial-body",
     );
 
-    expect(planets.length).toBe(8);
-    expect(dwarf.length).toBe(1);
-    expect(star.length).toBe(1);
-
-    const pluto = dwarf[0];
-    expect(pluto.id).toBe("pluto");
-    expect(CELESTIAL_BODIES).toHaveLength(9);
-    expect(CELESTIAL_BODIES.at(-1)?.symbolicNote).toContain("symbolic ninth");
+    expect(sun.length).toBe(1);
+    expect(bodies.length).toBe(REQUIRED_CELESTIAL_BODY_COUNT);
+    expect(CELESTIAL_BODIES).toHaveLength(REQUIRED_CELESTIAL_BODY_COUNT);
+    const pluto = CELESTIAL_BODIES.find((body) => body.id === "pluto");
+    expect(
+      pluto && "symbolicNote" in pluto ? pluto.symbolicNote : "",
+    ).toContain("symbolic ninth celestial body");
   });
 
-  it("all declared local files exist", () => {
+  it("all declared celestial asset files exist", () => {
     for (const asset of CELESTIAL_REGISTRY) {
       const imgPath = path.join(process.cwd(), "public", asset.imageSrc);
       expect(fs.existsSync(imgPath)).toBe(true);
-      expect(asset.credit).toBeDefined();
-      expect(asset.sourcePage).toMatch(/^https:/);
-      expect(asset.license).not.toBe("");
+      expect(asset.provenance.credit).toBeDefined();
+      expect(asset.provenance.sourcePage).toMatch(/^https:/);
+      expect(asset.provenance.license).not.toBe("");
     }
   });
 
@@ -112,5 +116,21 @@ describe("CosmicOrbitEngine", () => {
     expect(canvas).not.toBeNull();
     expect(canvas?.getAttribute("aria-hidden")).toBe("true");
     expect(canvas?.className).toContain("pointer-events-none");
+    expect(canvas?.dataset.celestialBodyCount).toBe(
+      String(REQUIRED_CELESTIAL_BODY_COUNT),
+    );
+  });
+
+  it("renders stable reduced-motion state without scheduling animation", () => {
+    render(<CosmicOrbitEngine reducedMotion />);
+    expect(requestAnimationFrameSpy).not.toHaveBeenCalled();
+  });
+
+  it("renders paused state without scheduling animation", () => {
+    const { container } = render(<CosmicOrbitEngine paused />);
+    expect(requestAnimationFrameSpy).not.toHaveBeenCalled();
+    expect(container.querySelector("canvas")?.dataset.cosmicMotion).toBe(
+      "paused",
+    );
   });
 });

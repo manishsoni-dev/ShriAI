@@ -2,10 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { CELESTIAL_BODIES, SUN_ASSET } from "@/lib/celestial-registry";
+import {
+  CELESTIAL_BODIES,
+  REQUIRED_CELESTIAL_BODY_COUNT,
+  SUN_ASSET,
+  type CelestialAsset,
+} from "@/lib/celestial-registry";
 
 const BODIES = CELESTIAL_BODIES;
-const SUN_IMAGE = { src: SUN_ASSET.imageSrc, credit: SUN_ASSET.credit };
+const TAU = Math.PI * 2;
+const AVIF_TEST_IMAGE =
+  "data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZgAAAPBtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAHmlsb2MAAAAABEAAAQABAAAAAAABAAAAFwAAABQAAABKaWluZgAAAAAAAwAAABppbmZlAgAAAAABAABhdjAxAAAAAAAUaW5mZQIAAAAAAgAAaXZhcwAAAAAAFGluZmUCAAAAAAMAAHBpeGkAAAAAAABCaXBycAAAABRpcGNvAAAAEGlzcGUAAAAAAAAAAQAAAAEAAAAQcGl4aQAAAAADCAgIAAAAF2F2MUMBAA0ACggYAAYICGgAAABQaXBtYQAAAAAAAAEAAQGDBAAAABttZGF0EgAKBzgABogQEAwgMg8f8D///8WfhwB8+ErK";
 
 type Star = {
   x: number;
@@ -37,44 +44,70 @@ function fract(value: number) {
 
 const assetCache = new Map<string, HTMLImageElement | ImageBitmap>();
 let loadingPromise: Promise<boolean> | null = null; // Returns true if all passed
+let avifSupportPromise: Promise<boolean> | null = null;
+
+function supportsAvif() {
+  if (avifSupportPromise) return avifSupportPromise;
+
+  avifSupportPromise = new Promise<boolean>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image.width === 1 && image.height === 1);
+    image.onerror = () => resolve(false);
+    image.src = AVIF_TEST_IMAGE;
+  });
+
+  return avifSupportPromise;
+}
+
+async function loadAsset(asset: CelestialAsset, prefersAvif: boolean) {
+  if (assetCache.has(asset.id)) return true;
+
+  const sources = prefersAvif
+    ? [asset.sources.avif, asset.sources.webp]
+    : [asset.sources.webp];
+
+  for (const source of sources) {
+    try {
+      const res = await fetch(source);
+      if (!res.ok) throw new Error("Failed to fetch");
+      const blob = await res.blob();
+      const bmp = await createImageBitmap(blob);
+      if (bmp.width <= 1 || bmp.height <= 1) {
+        throw new Error("Invalid asset dimensions");
+      }
+      assetCache.set(asset.id, bmp);
+      return true;
+    } catch {
+      const loaded = await new Promise<boolean>((resolve) => {
+        const img = new Image();
+        img.src = source;
+        img.onload = () => {
+          if (img.width > 1 && img.height > 1) {
+            assetCache.set(asset.id, img);
+            resolve(true);
+            return;
+          }
+          resolve(false);
+        };
+        img.onerror = () => resolve(false);
+      });
+
+      if (loaded) return true;
+    }
+  }
+
+  return false;
+}
 
 async function preloadAssets() {
   if (loadingPromise) return loadingPromise;
 
-  const urls = BODIES.map((b) => b.imageSrc).concat(SUN_IMAGE.src);
-  let allSuccess = true;
-
-  loadingPromise = Promise.all(
-    urls.map(async (url) => {
-      if (assetCache.has(url)) return;
-      try {
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to fetch");
-        const blob = await res.blob();
-        const bmp = await createImageBitmap(blob);
-        if (bmp.width <= 1 || bmp.height <= 1) {
-          throw new Error("Invalid asset dimensions");
-        }
-        assetCache.set(url, bmp);
-      } catch {
-        allSuccess = false;
-        // Fallback
-        return new Promise<void>((resolve) => {
-          const img = new Image();
-          img.src = url;
-          img.onload = () => {
-            if (img.width > 1 && img.height > 1) {
-              assetCache.set(url, img);
-            } else {
-              allSuccess = false;
-            }
-            resolve();
-          };
-          img.onerror = () => resolve(); // Don't crash
-        });
-      }
-    }),
-  ).then(() => allSuccess);
+  loadingPromise = supportsAvif().then(async (prefersAvif) => {
+    const results = await Promise.all(
+      [SUN_ASSET, ...BODIES].map((asset) => loadAsset(asset, prefersAvif)),
+    );
+    return results.every(Boolean);
+  });
 
   return loadingPromise;
 }
@@ -99,6 +132,8 @@ export type CosmicOrbitEngineProps = {
   centerXRatio?: number;
   centerYRatio?: number;
   showTrails?: boolean;
+  paused?: boolean;
+  reducedMotion?: boolean;
   reducedMotionFrameTime?: number;
 };
 
@@ -108,6 +143,8 @@ export function CosmicOrbitEngine({
   centerXRatio = 0.5,
   centerYRatio = 0.35,
   showTrails = true,
+  paused = false,
+  reducedMotion,
   reducedMotionFrameTime = 18,
 }: CosmicOrbitEngineProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -142,13 +179,22 @@ export function CosmicOrbitEngine({
     if (!canvas) return;
     const canvasElement = canvas;
 
-    const prefersReduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches;
+    const prefersReduced =
+      reducedMotion ??
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const motionDisabled = prefersReduced || paused;
     const lowPower = shouldUseLowPowerMode();
     const targetFrameMs = lowPower ? LOW_POWER_FRAME_MS : TARGET_FRAME_MS;
-    const trailsEnabled = showTrails && !lowPower;
+    const trailsEnabled = showTrails && !lowPower && !motionDisabled;
     canvasElement.dataset.cosmicPower = lowPower ? "low" : "standard";
+    canvasElement.dataset.cosmicMotion = prefersReduced
+      ? "reduced"
+      : paused
+        ? "paused"
+        : "running";
+    canvasElement.dataset.celestialBodyCount = String(
+      REQUIRED_CELESTIAL_BODY_COUNT,
+    );
 
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
@@ -179,8 +225,7 @@ export function CosmicOrbitEngine({
         });
     };
     const idleHandle = idleWindow.requestIdleCallback?.(loadAssets);
-    const loadTimer =
-      idleHandle === undefined ? window.setTimeout(loadAssets, 0) : null;
+    const loadTimer = window.setTimeout(loadAssets, 250);
 
     function resize() {
       const rect = canvasElement.getBoundingClientRect();
@@ -197,7 +242,7 @@ export function CosmicOrbitEngine({
       canvasElement.width = Math.floor(nextWidth * dpr);
       canvasElement.height = Math.floor(nextHeight * dpr);
 
-      if (prefersReduced) {
+      if (motionDisabled) {
         render(reducedMotionFrameTime * 1000);
       }
     }
@@ -220,7 +265,7 @@ export function CosmicOrbitEngine({
       animationId = null;
       if (!width || !height) return;
 
-      if (!prefersReduced && timestamp - lastFrameTime < targetFrameMs) {
+      if (!motionDisabled && timestamp - lastFrameTime < targetFrameMs) {
         schedule();
         return;
       }
@@ -228,7 +273,7 @@ export function CosmicOrbitEngine({
       lastFrameTime = timestamp;
       if (startTime === null) startTime = timestamp;
       let elapsed = (timestamp - startTime) / 1000;
-      if (prefersReduced) {
+      if (motionDisabled) {
         elapsed = reducedMotionFrameTime;
       }
 
@@ -282,7 +327,9 @@ export function CosmicOrbitEngine({
 
       // Calculate positions
       const renderedBodies = BODIES.map((body) => {
-        const angle = body.initialAngle + elapsed * body.angularVelocity;
+        const angle =
+          body.initialPhaseRadians +
+          elapsed * (TAU / body.orbitDurationSeconds);
         const aX = body.orbitRadiusFactor * maxOrbitRadius;
         const aY = body.orbitRadiusFactor * maxOrbitRadius * 0.44; // Squashed ellipse
 
@@ -334,7 +381,7 @@ export function CosmicOrbitEngine({
       }
 
       function drawPlanet(b: (typeof renderedBodies)[0]) {
-        const img = assetCache.get(b.body.imageSrc);
+        const img = assetCache.get(b.body.id);
         if (!img) {
           // Fallback circle
           context.globalAlpha =
@@ -390,7 +437,7 @@ export function CosmicOrbitEngine({
       for (const b of backBodies) drawPlanet(b);
 
       // Draw Sun
-      const sunImg = assetCache.get(SUN_IMAGE.src);
+      const sunImg = assetCache.get(SUN_ASSET.id);
       const sunRadius = scale * 0.08;
 
       // Sun Glow
@@ -432,7 +479,7 @@ export function CosmicOrbitEngine({
 
       context.restore(); // Ensure we pop the initial save state
 
-      if (!prefersReduced) {
+      if (!motionDisabled) {
         schedule();
       }
     }
@@ -442,7 +489,7 @@ export function CosmicOrbitEngine({
         cancel();
       } else {
         startTime = null;
-        if (!prefersReduced) schedule();
+        if (!motionDisabled) schedule();
       }
     }
 
@@ -451,7 +498,7 @@ export function CosmicOrbitEngine({
     resizeObserver.observe(canvasElement);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    if (prefersReduced) {
+    if (motionDisabled) {
       render(reducedMotionFrameTime * 1000);
     } else {
       schedule();
@@ -462,7 +509,7 @@ export function CosmicOrbitEngine({
       if (idleHandle !== undefined) {
         idleWindow.cancelIdleCallback?.(idleHandle);
       }
-      if (loadTimer !== null) window.clearTimeout(loadTimer);
+      window.clearTimeout(loadTimer);
       cancel();
       resizeObserver.disconnect();
       document.removeEventListener("visibilitychange", handleVisibilityChange);
@@ -470,6 +517,8 @@ export function CosmicOrbitEngine({
   }, [
     centerXRatio,
     centerYRatio,
+    paused,
+    reducedMotion,
     reducedMotionFrameTime,
     showTrails,
     opacity,
@@ -483,6 +532,7 @@ export function CosmicOrbitEngine({
         className={className}
         ref={canvasRef}
         data-cosmic-status={status}
+        data-celestial-body-count={REQUIRED_CELESTIAL_BODY_COUNT}
       />
       {isDebug && (
         <div className="fixed bottom-4 left-4 z-[9999] rounded bg-black/80 p-4 text-xs font-mono text-green-400 backdrop-blur">

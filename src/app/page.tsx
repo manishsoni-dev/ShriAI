@@ -31,8 +31,11 @@ const trustNotes = [
 export default function Home() {
   return (
     <PageShell>
-      <section className="relative mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center gap-10 px-5 py-14 md:grid-cols-[1.05fr_0.95fr] md:px-8">
-        <div className="relative z-10">
+      <section
+        className="relative mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center gap-8 overflow-hidden px-5 py-12 md:grid-cols-[1.08fr_0.92fr] md:px-8 lg:gap-6"
+        data-testid="home-hero"
+      >
+        <div className="hero-copy-safe relative z-20" data-testid="hero-copy">
           <SectionLabel>Divine Persona AI</SectionLabel>
           <h1 className="mt-5 max-w-4xl font-serif text-5xl font-semibold leading-[0.98] text-amber-50 md:text-7xl">
             Seek guidance through Dharma, Bhakti, Jñāna, and Seva
@@ -45,12 +48,14 @@ export default function Home() {
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Link
               className="inline-flex h-12 items-center justify-center rounded-md bg-gradient-to-r from-amber-300 to-orange-500 px-6 text-sm font-semibold text-[#170d05] shadow-[0_0_34px_rgba(245,158,11,0.28)] transition hover:brightness-110"
+              data-testid="hero-primary-cta"
               href="/chat"
             >
               Start Guidance
             </Link>
             <Link
               className="inline-flex h-12 items-center justify-center rounded-md border border-amber-200/18 px-6 text-sm font-semibold text-amber-50 transition hover:border-amber-200/38 hover:bg-amber-100/8"
+              data-testid="hero-secondary-cta"
               href="/personas"
             >
               Explore Personas
@@ -58,17 +63,16 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="relative z-10 min-h-[34rem]">
+        <div className="pointer-events-none relative z-10 min-h-[24rem] md:min-h-[31rem]">
           <div className="absolute inset-0 grid place-items-center">
-            <div className="relative h-72 w-72 rounded-full border border-amber-200/18 bg-amber-100/5 shadow-[0_0_120px_rgba(245,158,11,0.22)] md:h-96 md:w-96">
+            <div className="relative h-60 w-60 rounded-full border border-amber-200/14 bg-amber-100/5 shadow-[0_0_96px_rgba(245,158,11,0.18)] md:h-80 md:w-80">
               <Image
                 alt="Golden Shri AI mark inside a devotional mandala"
-                className="object-contain p-8 drop-shadow-[0_0_40px_rgba(245,158,11,0.38)]"
+                className="object-contain p-7 drop-shadow-[0_0_34px_rgba(245,158,11,0.28)]"
                 fill
-                priority
-                sizes="(min-width: 768px) 384px, 288px"
+                preload
+                sizes="(min-width: 768px) 320px, 240px"
                 src="/shri-mark.png"
-                unoptimized
               />
             </div>
           </div>
