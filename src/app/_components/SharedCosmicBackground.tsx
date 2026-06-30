@@ -44,20 +44,16 @@ export function SharedCosmicBackground() {
   // Route-specific opacity controls
   let opacity = 0.64; // Default for home and others
   let centerXRatio = 0.5;
-  let centerYRatio = 0.35;
+  let centerYRatio = 0.5;
   let showTrails = true;
 
   if (pathname === "/") {
     opacity = viewportWidth > 0 && viewportWidth < 768 ? 0.3 : 0.46;
-    centerXRatio = viewportWidth >= 1024 ? 0.72 : 0.5;
-    centerYRatio = viewportWidth >= 1024 ? 0.42 : 0.3;
     showTrails = viewportWidth >= 768;
   }
 
   if (pathname?.startsWith("/chat")) {
     opacity = 0.28;
-    centerXRatio = 0.5;
-    centerYRatio = 0.34;
     showTrails = false;
   }
 
