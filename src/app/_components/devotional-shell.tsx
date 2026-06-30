@@ -30,10 +30,9 @@ export function BrandMark({ compact = false }: { compact?: boolean }) {
           alt="Shri AI mark"
           className="object-contain p-1"
           fill
-          priority={compact}
+          preload={compact}
           sizes={compact ? "40px" : "48px"}
           src="/shri-mark.png"
-          unoptimized
         />
       </span>
       <span className="min-w-0">

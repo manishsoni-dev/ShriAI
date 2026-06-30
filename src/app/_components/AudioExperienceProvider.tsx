@@ -337,12 +337,12 @@ export function AudioExperienceProvider() {
         ? "Ready"
         : status === "unavailable"
           ? "Unavailable"
-          : "Paused";
+          : "OM off";
 
   return (
     <div
       aria-label="OM ambient sound controls"
-      className="fixed bottom-4 right-4 z-50 flex flex-col items-center gap-2 rounded-lg border border-amber-200/15 bg-[#090604]/88 p-2 text-amber-50 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl"
+      className="fixed right-3 top-24 z-50 flex items-center gap-2 rounded-lg border border-amber-200/15 bg-[#090604]/88 p-2 text-amber-50 shadow-[0_18px_60px_rgba(0,0,0,0.34)] backdrop-blur-xl sm:bottom-4 sm:right-4 sm:top-auto sm:flex-col"
       role="group"
     >
       <button
@@ -369,7 +369,7 @@ export function AudioExperienceProvider() {
 
       <input
         aria-label="OM volume"
-        className="h-24 w-2 accent-amber-300"
+        className="om-volume-slider hidden accent-amber-300 sm:block"
         disabled={disabled}
         max={MAX_VOLUME}
         min="0"
@@ -377,10 +377,6 @@ export function AudioExperienceProvider() {
           setVolume(clampOmVolume(Number(event.target.value)))
         }
         step="0.01"
-        style={{
-          direction: "rtl",
-          writingMode: "vertical-lr",
-        }}
         title="OM volume"
         type="range"
         value={volume}

@@ -1,19 +1,54 @@
-export type CelestialAsset = {
-  id: string;
-  displayName: string;
-  classification: "star" | "planet" | "dwarf-planet";
-  imageSrc: `/cosmic/${string}.webp`;
+export const REQUIRED_CELESTIAL_BODY_COUNT = 9;
+
+export type CosmicAssetFormat = "avif" | "webp";
+export type CosmicAssetPath = `/cosmic/${string}.${CosmicAssetFormat}`;
+export type AstronomicalType = "star" | "planet" | "dwarf-planet";
+export type VisualRole = "central-sun" | "symbolic-celestial-body";
+export type AltBehavior = "decorative";
+export type SourceOriginalStatus = "not-retained-in-repo";
+export type UsageRightsStatus = "source-linked-review-required";
+
+export type CelestialProvenance = {
+  referenceId: string;
   credit: string;
   sourcePage: string;
   license: string;
+  usageRightsStatus: UsageRightsStatus;
+  sourceOriginalStatus: SourceOriginalStatus;
+  replacementRequirement: string;
+  dateChecked: "2026-06-30";
+};
+
+export type CelestialAsset = {
+  id: string;
+  displayName: string;
+  astronomicalType: AstronomicalType;
+  visualRole: VisualRole;
+  imageSrc: CosmicAssetPath;
+  sources: {
+    avif: CosmicAssetPath;
+    webp: CosmicAssetPath;
+  };
+  width: number;
+  height: number;
+  fileSizeBytes: {
+    avif: number;
+    webp: number;
+  };
+  hasAlpha: boolean;
+  requiresTransparency: boolean;
+  highDensitySuitable: boolean;
+  altBehavior: AltBehavior;
+  provenance: CelestialProvenance;
 };
 
 export type OrbitingCelestialBody = CelestialAsset & {
-  classification: "planet" | "dwarf-planet";
+  visualRole: "symbolic-celestial-body";
   orbitRadiusFactor: number;
+  orbitDurationSeconds: number;
+  initialPhaseRadians: number;
+  zIndexTier: number;
   displayRadiusFactor: number;
-  angularVelocity: number;
-  initialAngle: number;
   inclination: number;
   opacity: number;
   symbolicNote?: string;
@@ -22,166 +57,365 @@ export type OrbitingCelestialBody = CelestialAsset & {
 const COMMONS_LICENSE =
   "Wikimedia Commons source page; NASA imagery/public-domain terms apply as documented there.";
 
+const SOURCE_ORIGINAL_REPLACEMENT =
+  "Retain the original high-resolution source outside browser delivery before claiming 4K quality or redistributing these derivatives outside Shri AI.";
+
+function provenance(input: {
+  id: string;
+  credit: string;
+  sourcePage: string;
+}): CelestialProvenance {
+  return {
+    referenceId: `cosmic-source-${input.id}`,
+    credit: input.credit,
+    sourcePage: input.sourcePage,
+    license: COMMONS_LICENSE,
+    usageRightsStatus: "source-linked-review-required",
+    sourceOriginalStatus: "not-retained-in-repo",
+    replacementRequirement: SOURCE_ORIGINAL_REPLACEMENT,
+    dateChecked: "2026-06-30",
+  };
+}
+
 export const SUN_ASSET: CelestialAsset = {
   id: "sun",
   displayName: "Sun",
-  classification: "star",
+  astronomicalType: "star",
+  visualRole: "central-sun",
   imageSrc: "/cosmic/sun.webp",
-  credit: "NASA/SDO",
-  sourcePage:
-    "https://commons.wikimedia.org/wiki/File:The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg",
-  license: COMMONS_LICENSE,
+  sources: {
+    avif: "/cosmic/sun.avif",
+    webp: "/cosmic/sun.webp",
+  },
+  width: 512,
+  height: 512,
+  fileSizeBytes: {
+    avif: 62_715,
+    webp: 58_062,
+  },
+  hasAlpha: true,
+  requiresTransparency: true,
+  highDensitySuitable: true,
+  altBehavior: "decorative",
+  provenance: provenance({
+    id: "sun",
+    credit: "NASA/SDO",
+    sourcePage:
+      "https://commons.wikimedia.org/wiki/File:The_Sun_by_the_Atmospheric_Imaging_Assembly_of_NASA%27s_Solar_Dynamics_Observatory_-_20100819.jpg",
+  }),
 };
 
-/** Eight planets plus Pluto as Shri AI's intentionally symbolic ninth body. */
-export const CELESTIAL_BODIES: OrbitingCelestialBody[] = [
+export const CELESTIAL_BODIES = [
   {
     id: "mercury",
     displayName: "Mercury",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/mercury.webp",
-    credit:
-      "NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington",
-    sourcePage:
-      "https://commons.wikimedia.org/wiki/File:Mercury_in_true_color.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/mercury.avif",
+      webp: "/cosmic/mercury.webp",
+    },
+    width: 256,
+    height: 256,
+    fileSizeBytes: {
+      avif: 9_583,
+      webp: 10_180,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "mercury",
+      credit:
+        "NASA/Johns Hopkins University Applied Physics Laboratory/Carnegie Institution of Washington",
+      sourcePage:
+        "https://commons.wikimedia.org/wiki/File:Mercury_in_true_color.jpg",
+    }),
     orbitRadiusFactor: 0.12,
+    orbitDurationSeconds: 7.85,
+    initialPhaseRadians: 0.5,
+    zIndexTier: 10,
     displayRadiusFactor: 0.012,
-    angularVelocity: 0.8,
-    initialAngle: 0.5,
     inclination: 0.02,
-    opacity: 0.9,
+    opacity: 0.82,
   },
   {
     id: "venus",
     displayName: "Venus",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/venus.webp",
-    credit: "NASA/JPL-Caltech",
-    sourcePage: "https://commons.wikimedia.org/wiki/File:Venus-real_color.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/venus.avif",
+      webp: "/cosmic/venus.webp",
+    },
+    width: 256,
+    height: 256,
+    fileSizeBytes: {
+      avif: 2_752,
+      webp: 3_602,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "venus",
+      credit: "NASA/JPL-Caltech",
+      sourcePage:
+        "https://commons.wikimedia.org/wiki/File:Venus-real_color.jpg",
+    }),
     orbitRadiusFactor: 0.18,
+    orbitDurationSeconds: 10.47,
+    initialPhaseRadians: 1.2,
+    zIndexTier: 10,
     displayRadiusFactor: 0.02,
-    angularVelocity: 0.6,
-    initialAngle: 1.2,
     inclination: 0.01,
-    opacity: 0.95,
+    opacity: 0.86,
   },
   {
     id: "earth",
     displayName: "Earth",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/earth.webp",
-    credit: "NASA",
-    sourcePage:
-      "https://commons.wikimedia.org/wiki/File:The_Earth_seen_from_Apollo_17.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/earth.avif",
+      webp: "/cosmic/earth.webp",
+    },
+    width: 256,
+    height: 256,
+    fileSizeBytes: {
+      avif: 16_295,
+      webp: 16_524,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "earth",
+      credit: "NASA",
+      sourcePage:
+        "https://commons.wikimedia.org/wiki/File:The_Earth_seen_from_Apollo_17.jpg",
+    }),
     orbitRadiusFactor: 0.25,
+    orbitDurationSeconds: 13.96,
+    initialPhaseRadians: 3.14,
+    zIndexTier: 20,
     displayRadiusFactor: 0.021,
-    angularVelocity: 0.45,
-    initialAngle: 3.14,
     inclination: 0,
-    opacity: 1,
+    opacity: 0.9,
   },
   {
     id: "mars",
     displayName: "Mars",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/mars.webp",
-    credit: "NASA, ESA, and The Hubble Heritage Team (STScI/AURA)",
-    sourcePage:
-      "https://commons.wikimedia.org/wiki/File:Mars_-_August_30_2001_-_Hubble.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/mars.avif",
+      webp: "/cosmic/mars.webp",
+    },
+    width: 256,
+    height: 256,
+    fileSizeBytes: {
+      avif: 4_351,
+      webp: 4_800,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "mars",
+      credit: "NASA, ESA, and The Hubble Heritage Team (STScI/AURA)",
+      sourcePage:
+        "https://commons.wikimedia.org/wiki/File:Mars_-_August_30_2001_-_Hubble.jpg",
+    }),
     orbitRadiusFactor: 0.32,
+    orbitDurationSeconds: 17.95,
+    initialPhaseRadians: 4.5,
+    zIndexTier: 20,
     displayRadiusFactor: 0.015,
-    angularVelocity: 0.35,
-    initialAngle: 4.5,
     inclination: -0.01,
-    opacity: 0.9,
+    opacity: 0.82,
   },
   {
     id: "jupiter",
     displayName: "Jupiter",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/jupiter.webp",
-    credit: "NASA, ESA, and A. Simon (Goddard Space Flight Center)",
-    sourcePage: "https://commons.wikimedia.org/wiki/File:Jupiter.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/jupiter.avif",
+      webp: "/cosmic/jupiter.webp",
+    },
+    width: 384,
+    height: 384,
+    fileSizeBytes: {
+      avif: 8_422,
+      webp: 11_344,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "jupiter",
+      credit: "NASA, ESA, and A. Simon (Goddard Space Flight Center)",
+      sourcePage: "https://commons.wikimedia.org/wiki/File:Jupiter.jpg",
+    }),
     orbitRadiusFactor: 0.48,
-    displayRadiusFactor: 0.045,
-    angularVelocity: 0.2,
-    initialAngle: 2.1,
+    orbitDurationSeconds: 31.42,
+    initialPhaseRadians: 2.1,
+    zIndexTier: 30,
+    displayRadiusFactor: 0.04,
     inclination: 0.005,
-    opacity: 1,
+    opacity: 0.92,
   },
   {
     id: "saturn",
     displayName: "Saturn",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/saturn.webp",
-    credit: "NASA/JPL/Space Science Institute",
-    sourcePage:
-      "https://commons.wikimedia.org/wiki/File:Saturn_during_Equinox.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/saturn.avif",
+      webp: "/cosmic/saturn.webp",
+    },
+    width: 512,
+    height: 512,
+    fileSizeBytes: {
+      avif: 8_269,
+      webp: 11_320,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "saturn",
+      credit: "NASA/JPL/Space Science Institute",
+      sourcePage:
+        "https://commons.wikimedia.org/wiki/File:Saturn_during_Equinox.jpg",
+    }),
     orbitRadiusFactor: 0.64,
-    displayRadiusFactor: 0.08,
-    angularVelocity: 0.15,
-    initialAngle: 5.5,
+    orbitDurationSeconds: 41.89,
+    initialPhaseRadians: 5.5,
+    zIndexTier: 30,
+    displayRadiusFactor: 0.068,
     inclination: 0.015,
-    opacity: 1,
+    opacity: 0.88,
   },
   {
     id: "uranus",
     displayName: "Uranus",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/uranus.webp",
-    credit: "NASA/JPL-Caltech",
-    sourcePage: "https://commons.wikimedia.org/wiki/File:Uranus2.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/uranus.avif",
+      webp: "/cosmic/uranus.webp",
+    },
+    width: 256,
+    height: 256,
+    fileSizeBytes: {
+      avif: 1_976,
+      webp: 2_480,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "uranus",
+      credit: "NASA/JPL-Caltech",
+      sourcePage: "https://commons.wikimedia.org/wiki/File:Uranus2.jpg",
+    }),
     orbitRadiusFactor: 0.8,
-    displayRadiusFactor: 0.028,
-    angularVelocity: 0.1,
-    initialAngle: 0.9,
+    orbitDurationSeconds: 62.83,
+    initialPhaseRadians: 0.9,
+    zIndexTier: 40,
+    displayRadiusFactor: 0.024,
     inclination: -0.005,
-    opacity: 0.9,
+    opacity: 0.76,
   },
   {
     id: "neptune",
     displayName: "Neptune",
-    classification: "planet",
+    astronomicalType: "planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/neptune.webp",
-    credit: "NASA/JPL-Caltech",
-    sourcePage: "https://commons.wikimedia.org/wiki/File:Neptune_Full.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/neptune.avif",
+      webp: "/cosmic/neptune.webp",
+    },
+    width: 256,
+    height: 256,
+    fileSizeBytes: {
+      avif: 2_436,
+      webp: 3_070,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "neptune",
+      credit: "NASA/JPL-Caltech",
+      sourcePage: "https://commons.wikimedia.org/wiki/File:Neptune_Full.jpg",
+    }),
     orbitRadiusFactor: 0.92,
-    displayRadiusFactor: 0.027,
-    angularVelocity: 0.08,
-    initialAngle: 3.8,
+    orbitDurationSeconds: 78.54,
+    initialPhaseRadians: 3.8,
+    zIndexTier: 40,
+    displayRadiusFactor: 0.023,
     inclination: 0.01,
-    opacity: 0.9,
+    opacity: 0.74,
   },
   {
     id: "pluto",
     displayName: "Pluto",
-    classification: "dwarf-planet",
+    astronomicalType: "dwarf-planet",
+    visualRole: "symbolic-celestial-body",
     imageSrc: "/cosmic/pluto.webp",
-    credit:
-      "NASA/Johns Hopkins University Applied Physics Laboratory/Southwest Research Institute",
-    sourcePage:
-      "https://commons.wikimedia.org/wiki/File:Pluto_in_True_Color_-_High-Res.jpg",
-    license: COMMONS_LICENSE,
+    sources: {
+      avif: "/cosmic/pluto.avif",
+      webp: "/cosmic/pluto.webp",
+    },
+    width: 128,
+    height: 128,
+    fileSizeBytes: {
+      avif: 2_671,
+      webp: 2_688,
+    },
+    hasAlpha: true,
+    requiresTransparency: true,
+    highDensitySuitable: true,
+    altBehavior: "decorative",
+    provenance: provenance({
+      id: "pluto",
+      credit:
+        "NASA/Johns Hopkins University Applied Physics Laboratory/Southwest Research Institute",
+      sourcePage:
+        "https://commons.wikimedia.org/wiki/File:Pluto_in_True_Color_-_High-Res.jpg",
+    }),
     orbitRadiusFactor: 1.05,
+    orbitDurationSeconds: 104.72,
+    initialPhaseRadians: 6.1,
+    zIndexTier: 40,
     displayRadiusFactor: 0.008,
-    angularVelocity: 0.06,
-    initialAngle: 6.1,
     inclination: 0.06,
-    opacity: 0.8,
+    opacity: 0.68,
     symbolicNote:
-      "Intentionally retained as Shri AI's symbolic ninth celestial body; astronomically classified as a dwarf planet.",
+      "Pluto is intentionally retained as Shri AI's symbolic ninth celestial body and is astronomically classified as a dwarf planet.",
   },
-];
+] as const satisfies readonly OrbitingCelestialBody[];
 
-export const CELESTIAL_REGISTRY: CelestialAsset[] = [
+export const CELESTIAL_REGISTRY = [
   SUN_ASSET,
   ...CELESTIAL_BODIES,
-];
+] as const satisfies readonly CelestialAsset[];
