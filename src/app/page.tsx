@@ -28,24 +28,30 @@ const trustNotes = [
   "Designed for reflection, emotional clarity, and practical next steps.",
 ];
 
+const heroTrustNotes = [
+  "Grounded guidance",
+  "Clear source boundaries",
+  "Private local-first architecture",
+];
+
 export default function Home() {
   return (
     <PageShell>
       <section
-        className="relative mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center gap-8 overflow-hidden px-5 py-12 md:grid-cols-[1.08fr_0.92fr] md:px-8 lg:gap-6"
+        className="relative mx-auto grid min-h-[calc(100vh-5rem)] w-full max-w-7xl items-center gap-8 overflow-hidden px-5 py-12 md:grid-cols-[1.02fr_0.98fr] md:px-8 lg:gap-10"
         data-testid="home-hero"
       >
         <div className="hero-copy-safe relative z-20" data-testid="hero-copy">
           <SectionLabel>Divine Persona AI</SectionLabel>
           <h1 className="mt-5 max-w-4xl font-serif text-5xl font-semibold leading-[0.98] text-amber-50 md:text-7xl">
-            Seek guidance through Dharma, Bhakti, Jñāna, and Seva
+            Start a quieter guidance practice
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-amber-100/70">
-            Shri AI blends a sacred temple atmosphere with modern AI guidance,
-            helping you reflect with six Hindu-inspired personas rooted in
-            clarity, devotion, courage, silence, resilience, and love.
+            Shri AI helps you reflect with Hindu-inspired personas, grounded
+            retrieval when sources are available, and honest unsourced
+            reflection when they are not.
           </p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center">
             <Link
               className="inline-flex h-12 items-center justify-center rounded-md bg-gradient-to-r from-amber-300 to-orange-500 px-6 text-sm font-semibold text-[#170d05] shadow-[0_0_34px_rgba(245,158,11,0.28)] transition hover:brightness-110"
               data-testid="hero-primary-cta"
@@ -54,12 +60,22 @@ export default function Home() {
               Start Guidance
             </Link>
             <Link
-              className="inline-flex h-12 items-center justify-center rounded-md border border-amber-200/18 px-6 text-sm font-semibold text-amber-50 transition hover:border-amber-200/38 hover:bg-amber-100/8"
+              className="inline-flex h-10 items-center text-sm font-semibold text-amber-100/78 transition hover:text-amber-50"
               data-testid="hero-secondary-cta"
               href="/personas"
             >
-              Explore Personas
+              Explore personas
             </Link>
+          </div>
+          <div className="mt-8 flex flex-wrap gap-2" aria-label="Trust signals">
+            {heroTrustNotes.map((note) => (
+              <span
+                className="rounded-md border border-amber-100/10 bg-black/25 px-3 py-2 text-xs font-medium text-amber-100/72"
+                key={note}
+              >
+                {note}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -70,6 +86,7 @@ export default function Home() {
                 alt="Golden Shri AI mark inside a devotional mandala"
                 className="object-contain p-7 drop-shadow-[0_0_34px_rgba(245,158,11,0.28)]"
                 fill
+                loading="eager"
                 preload
                 sizes="(min-width: 768px) 320px, 240px"
                 src="/shri-mark.png"

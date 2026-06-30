@@ -3,6 +3,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render } from "@testing-library/react";
 import { CosmicOrbitEngine } from "../src/app/_components/CosmicOrbitEngine";
+import { SharedCosmicBackground } from "../src/app/_components/SharedCosmicBackground";
 import {
   CELESTIAL_BODIES,
   CELESTIAL_REGISTRY,
@@ -10,6 +11,10 @@ import {
 } from "../src/lib/celestial-registry";
 import fs from "fs";
 import path from "path";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+}));
 
 // Mock APIs
 global.ResizeObserver = class ResizeObserver {
@@ -131,6 +136,28 @@ describe("CosmicOrbitEngine", () => {
     expect(requestAnimationFrameSpy).not.toHaveBeenCalled();
     expect(container.querySelector("canvas")?.dataset.cosmicMotion).toBe(
       "paused",
+    );
+  });
+
+  it("keeps the home cosmic stage geometrically centered", () => {
+    vi.mocked(window.matchMedia).mockReturnValue({
+      matches: false,
+      media: "(prefers-reduced-motion: no-preference)",
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    } as any);
+
+    const { container } = render(<SharedCosmicBackground />);
+    const canvas = container.querySelector("canvas");
+
+    expect(canvas?.dataset.cosmicCenterX).toBe("0.50");
+    expect(canvas?.dataset.cosmicCenterY).toBe("0.50");
+    expect(canvas?.dataset.celestialBodyCount).toBe(
+      String(REQUIRED_CELESTIAL_BODY_COUNT),
     );
   });
 });

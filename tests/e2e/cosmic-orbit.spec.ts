@@ -36,6 +36,8 @@ test.describe("Cosmic Orbit Engine", () => {
       const canvas = page.locator("canvas[data-cosmic-status]");
       await expect(canvas).toBeAttached();
       await expect(canvas).toHaveAttribute("data-celestial-body-count", "9");
+      await expect(canvas).toHaveAttribute("data-cosmic-center-x", "0.50");
+      await expect(canvas).toHaveAttribute("data-cosmic-center-y", "0.50");
       await expect(canvas).toHaveAttribute("data-cosmic-status", "ready", {
         timeout: 15000,
       });
@@ -71,12 +73,12 @@ test.describe("Cosmic Orbit Engine", () => {
     await toggle.click();
     await expect(canvas).toHaveAttribute("data-cosmic-motion", "paused");
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
-    await expect(toggle).toHaveText("Resume motion");
+    await expect(toggle).toHaveText("Resume");
 
     await toggle.press("Enter");
     await expect(canvas).toHaveAttribute("data-cosmic-motion", "running");
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
-    await expect(toggle).toHaveText("Pause motion");
+    await expect(toggle).toHaveText("Pause");
   });
 
   test("honors reduced motion immediately", async ({ page }) => {

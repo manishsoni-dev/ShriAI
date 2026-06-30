@@ -46,11 +46,12 @@ export function SharedCosmicBackground() {
   let centerXRatio = 0.5;
   let centerYRatio = 0.35;
   let showTrails = true;
+  const isHome = pathname === "/";
 
-  if (pathname === "/") {
+  if (isHome) {
     opacity = viewportWidth > 0 && viewportWidth < 768 ? 0.3 : 0.46;
-    centerXRatio = viewportWidth >= 1024 ? 0.72 : 0.5;
-    centerYRatio = viewportWidth >= 1024 ? 0.42 : 0.3;
+    centerXRatio = 0.5;
+    centerYRatio = 0.5;
     showTrails = viewportWidth >= 768;
   }
 
@@ -70,7 +71,10 @@ export function SharedCosmicBackground() {
 
   return (
     <>
-      <div className="cosmic-backdrop" aria-hidden="true">
+      <div
+        className={`cosmic-backdrop ${isHome ? "cosmic-backdrop--home" : ""}`}
+        aria-hidden="true"
+      >
         <CosmicOrbitEngine
           opacity={opacity}
           centerXRatio={centerXRatio}
@@ -94,8 +98,8 @@ export function SharedCosmicBackground() {
           {prefersReducedMotion
             ? "Motion reduced"
             : motionPaused
-              ? "Resume motion"
-              : "Pause motion"}
+              ? "Resume"
+              : "Pause"}
         </button>
         <span className="sr-only" aria-live="polite">
           {motionStopped ? "Cosmic motion paused." : "Cosmic motion running."}

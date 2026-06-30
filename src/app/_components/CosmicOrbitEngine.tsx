@@ -306,6 +306,8 @@ export function CosmicOrbitEngine({
       context.globalAlpha = 1;
       context.globalCompositeOperation = "source-over";
       context.clearRect(0, 0, width, height);
+      canvasElement.dataset.cosmicCenterX = centerXRatio.toFixed(2);
+      canvasElement.dataset.cosmicCenterY = centerYRatio.toFixed(2);
 
       // Draw Stars
       for (const star of STAR_FIELD) {
@@ -532,6 +534,8 @@ export function CosmicOrbitEngine({
         className={className}
         ref={canvasRef}
         data-cosmic-status={status}
+        data-cosmic-center-x={centerXRatio.toFixed(2)}
+        data-cosmic-center-y={centerYRatio.toFixed(2)}
         data-celestial-body-count={REQUIRED_CELESTIAL_BODY_COUNT}
       />
       {isDebug && (
