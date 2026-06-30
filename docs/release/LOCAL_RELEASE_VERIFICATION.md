@@ -12,6 +12,42 @@ services and human evidence:
 npm run release:verify:local
 ```
 
+## Release Claim Boundaries
+
+Use these labels consistently in README updates, release notes, demos, and
+portfolio copy:
+
+| Label            | Meaning                                                                                                                                  |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Implemented      | Code path exists in the repository and is covered by local tests or build checks.                                                        |
+| Staged           | Code path is present but depends on rollout flags, managed-service configuration, or human staging evidence before release.              |
+| Unverified       | Code path may exist, but this branch does not contain current end-to-end evidence proving it works in the target release environment.    |
+| Local-only       | Verification requires local trusted services such as Ollama, faster-whisper STT, Postgres/pgvector, and manual Voice QA evidence.        |
+| Production-ready | Do not use this label unless hosted CI, local release verification, staging checks, security review, and rollback notes are all current. |
+
+Required end-to-end proof for a truthful release claim:
+
+1. Sign in with a real configured local or staging user.
+2. Open chat and complete a typed guidance turn.
+3. Exercise retrieval against reviewed local corpus evidence.
+4. Verify citations are limited to retrieved/validated sources.
+5. Verify the local-AI unavailable state is truthful when Ollama is missing or
+   unhealthy.
+6. Optionally verify voice fallback: no microphone prompt before consent, safe
+   typed fallback on denial or STT failure, and same-origin STT routing when
+   allowed.
+
+If any step is not run, mark the release evidence as `Unverified`, not
+`Production-ready`.
+
+Provider and auth boundaries for this release baseline:
+
+- Legacy Auth.js remains the active fallback while Supabase cutover is staged.
+- Pinecone, Resend, Inngest, PostHog, and Sentry are provider boundaries unless
+  a later phase activates and verifies them.
+- Missing local Ollama, local STT, reviewed corpus evidence, or manual Voice QA
+  means release status is `Unverified`, even when tests and builds pass.
+
 ## Prerequisites
 
 - PostgreSQL with pgvector and all committed migrations applied.
@@ -83,3 +119,18 @@ High-severity audit findings must be removed when a safe non-breaking update is
 available. If npm reports only a breaking downgrade or otherwise unsafe fix,
 record the package path, exploit relevance, available fix, and reason for
 remaining blocked in the release notes.
+
+## Archive Reproducibility Notes
+
+An ad hoc ZIP or development snapshot is not release evidence. The official
+safe archive path is:
+
+```bash
+npm run source:archive
+```
+
+That command must run from a clean committed tree and then verify the ZIP
+excludes environment files, `.git`, dependencies, build outputs, runtime logs,
+local databases, uploads, and eval output. If an externally audited archive was
+not produced by this command, record it as an archive reproducibility defect
+rather than proof that hosted CI or the application is broken.

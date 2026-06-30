@@ -41,21 +41,18 @@ export function SharedCosmicBackground() {
   const viewportWidth = useViewportWidth();
   const [motionPaused, setMotionPaused] = useState(false);
 
-  // Route-specific opacity controls
-  let opacity = 0.64; // Default for home and others
-  let centerXRatio = 0.5;
-  let centerYRatio = 0.5;
-  let showTrails = true;
-
-  if (pathname === "/") {
-    opacity = viewportWidth > 0 && viewportWidth < 768 ? 0.3 : 0.46;
-    showTrails = viewportWidth >= 768;
-  }
-
-  if (pathname?.startsWith("/chat")) {
-    opacity = 0.28;
-    showTrails = false;
-  }
+  const isHome = pathname === "/";
+  const isChat = pathname?.startsWith("/chat") ?? false;
+  const opacity = isChat
+    ? 0.28
+    : isHome && viewportWidth > 0 && viewportWidth < 768
+      ? 0.3
+      : isHome
+        ? 0.46
+        : 0.64;
+  const centerXRatio = 0.5;
+  const centerYRatio = 0.5;
+  const showTrails = isChat ? false : isHome ? viewportWidth >= 768 : true;
 
   const motionStopped = prefersReducedMotion || motionPaused;
   const buttonLabel = prefersReducedMotion

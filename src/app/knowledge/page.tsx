@@ -85,7 +85,8 @@ export default async function KnowledgePage({
               Knowledge
             </h1>
             <p className="mt-2 text-sm text-[#43514f]">
-              Upload workspace documents for future retrieval workflows.
+              Upload workspace documents for extraction, chunking, embeddings,
+              and workspace search.
             </p>
           </div>
           <div className="flex gap-3">
@@ -175,8 +176,9 @@ export default async function KnowledgePage({
                   No documents yet
                 </h3>
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#43514f]">
-                  Upload documents here now; chunking, embeddings, and RAG
-                  retrieval can build on this metadata and storage layer next.
+                  Upload, text extraction, chunking, embeddings, and search are
+                  implemented. End-to-end retrieval quality still depends on
+                  validated local infrastructure and reviewed corpus evidence.
                 </p>
               </div>
             ) : (

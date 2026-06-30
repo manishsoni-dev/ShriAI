@@ -1,9 +1,5 @@
 import { db } from "@/lib/db";
 
-// Pricing per 1M tokens (GPT-4o standard)
-const INPUT_PRICE_PER_MILLION = 5.0;
-const OUTPUT_PRICE_PER_MILLION = 15.0;
-
 export async function getFeedbackAggregates() {
   const feedbacks = await db.userFeedback.findMany({
     select: {
@@ -56,28 +52,40 @@ export async function getLatencyAggregates() {
   };
 }
 
-export async function getCostAggregates() {
+export async function getLocalRuntimeAggregates() {
   const usage = await db.usageEvent.aggregate({
+    _count: {
+      _all: true,
+    },
     _sum: {
       inputTokens: true,
       outputTokens: true,
     },
   });
+  const failedUsage = await db.usageEvent.count({
+    where: {
+      status: "error",
+    },
+  });
 
   const inputTokens = usage._sum.inputTokens || 0;
   const outputTokens = usage._sum.outputTokens || 0;
-
-  const estimatedInputCost =
-    (inputTokens / 1_000_000) * INPUT_PRICE_PER_MILLION;
-  const estimatedOutputCost =
-    (outputTokens / 1_000_000) * OUTPUT_PRICE_PER_MILLION;
-  const totalEstimatedCost = estimatedInputCost + estimatedOutputCost;
+  const requestCount = usage._count._all;
+  const errorRate =
+    requestCount > 0
+      ? Number(((failedUsage / requestCount) * 100).toFixed(1))
+      : 0;
 
   return {
     inputTokens,
     outputTokens,
     totalTokens: inputTokens + outputTokens,
-    totalEstimatedCostUSD: Number(totalEstimatedCost.toFixed(4)),
+    requestCount,
+    errorCount: failedUsage,
+    errorRate,
+    costEstimateLabel: "Unavailable",
+    costEstimateDescription:
+      "Cost estimate unavailable for local-first runtime.",
   };
 }
 

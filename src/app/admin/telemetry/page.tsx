@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { requireReviewerForPage } from "@/lib/scripture-review/reviews";
 import {
-  getCostAggregates,
   getFeedbackAggregates,
   getLatencyAggregates,
+  getLocalRuntimeAggregates,
   getVoiceQaAggregates,
 } from "@/lib/telemetry/queries";
 import { AlertCard, KpiCard, SectionHeader } from "./kpi-cards";
@@ -26,10 +26,10 @@ export default async function TelemetryDashboard() {
     );
   }
 
-  const [feedback, latency, cost, voiceQa] = await Promise.all([
+  const [feedback, latency, localRuntime, voiceQa] = await Promise.all([
     getFeedbackAggregates(),
     getLatencyAggregates(),
-    getCostAggregates(),
+    getLocalRuntimeAggregates(),
     getVoiceQaAggregates(),
   ]);
 
@@ -132,8 +132,8 @@ export default async function TelemetryDashboard() {
         </div>
 
         <SectionHeader
-          title="Latency & Cost"
-          description="Performance and usage metrics aggregated across all successful text chat interactions."
+          title="Local Runtime Usage"
+          description="Performance and usage metrics for the local-first model runtime. Hosted-model spend is not estimated."
         />
         <div className="grid gap-6 md:grid-cols-4">
           <KpiCard
@@ -148,13 +148,18 @@ export default async function TelemetryDashboard() {
           />
           <KpiCard
             title="Total Tokens Processed"
-            value={cost.totalTokens.toLocaleString()}
-            description={`In: ${cost.inputTokens.toLocaleString()} · Out: ${cost.outputTokens.toLocaleString()}`}
+            value={localRuntime.totalTokens.toLocaleString()}
+            description={`In: ${localRuntime.inputTokens.toLocaleString()} · Out: ${localRuntime.outputTokens.toLocaleString()}`}
           />
           <KpiCard
-            title="Estimated Cost (USD)"
-            value={`$${cost.totalEstimatedCostUSD.toFixed(2)}`}
-            description="Approximate LLM spend based on standard GPT-4o pricing."
+            title="Local Runtime Errors"
+            value={`${localRuntime.errorRate.toFixed(1)}%`}
+            description={`${localRuntime.errorCount.toLocaleString()} errors / ${localRuntime.requestCount.toLocaleString()} usage events`}
+          />
+          <KpiCard
+            title="Cost Estimate"
+            value={localRuntime.costEstimateLabel}
+            description={localRuntime.costEstimateDescription}
           />
         </div>
 
