@@ -178,8 +178,8 @@ export default async function KnowledgePage({
                 <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#43514f]">
                   Upload, text extraction, chunking, embeddings, and semantic
                   search are implemented. End-to-end retrieval quality still
-                  depends on validated local infrastructure and reviewed source
-                  material.
+                  depends on configured local services and reviewed scripture
+                  evidence.
                 </p>
               </div>
             ) : (

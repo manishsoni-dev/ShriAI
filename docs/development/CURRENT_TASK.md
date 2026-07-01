@@ -163,16 +163,28 @@ git status --short
 
 ### Tests Run
 
-- Pending final gate after merge resolution.
+- `npm run format:check`: passed.
+- `npm run lint`: passed with `eslint --max-warnings=0`.
+- `npm run typecheck`: passed.
+- `npm run test`: passed, 55 files / 284 tests. Vitest printed the existing
+  non-fatal jsdom canvas `getContext()` notice.
+- `npm run build`: passed; Next.js 16.2.6 generated 28 static pages.
+- `git diff --check`: passed with no output.
+- `git status --short`: clean during final verification.
 
 ### Checks Passed
 
-- Pending final gate after merge resolution.
+- `npm run format:check`
+- `npm run lint`
+- `npm run typecheck`
+- `npm run test`
+- `npm run build`
+- `git diff --check`
+- `git status --short`
 
 ### Checks Failed
 
-- None so far. The merge conflict was limited to this file and has been
-  resolved.
+- None.
 
 ### Remaining Blockers
 
