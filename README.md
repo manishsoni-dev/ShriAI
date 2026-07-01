@@ -6,6 +6,22 @@ Initial foundation for a production-grade AI assistant web app built with Next.j
 
 Shri AI is a full-stack AI assistant foundation with authentication, workspace-aware conversations, provider-isolated model access, usage logging, and a knowledge-base ingestion flow for document search.
 
+## Product Truthfulness Status
+
+The repository contains real implementation work, but local release evidence is
+not the same as production readiness.
+
+| Status             | Current state                                                                                                                                                                                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implemented        | Auth-protected routes, workspace conversations, local Ollama chat gateway, usage logging, document upload/extraction/chunking/embeddings/search, scripture retrieval/citation validation, voice routing, reviewer tooling, and the centered cosmic system with nine celestial bodies. |
+| Verified           | Local `format:check`, `lint`, `typecheck`, `test`, `build`, and whitespace checks are evidence only when they are recorded for the current branch in `docs/research/SHRI_AI_DECISION_LOG.md`. They are not end-to-end release proof.                                                  |
+| Staged             | Auth is hybrid: legacy Auth.js remains active while Supabase cutover is staged. Pinecone, Resend, Inngest, PostHog, and Sentry are prepared provider boundaries, not active product integrations. Voice-safe scripture review gates and manual staging release checks remain staged.  |
+| Unverified         | End-to-end release proof for sign-in → chat → scripture retrieval → citation validation → saved conversation → local-AI unavailable state → failed document ingestion → voice permission denial/fallback has not been recorded in this branch.                                        |
+| Local-only         | Ollama, faster-whisper STT, local Postgres/pgvector, release evaluation, and manual Voice QA evidence.                                                                                                                                                                                |
+| Provider boundary  | Pinecone, Resend, Inngest, PostHog, and Sentry configuration and documentation boundaries exist, but they are not active product integrations unless activated in runtime code and verified by a scoped phase.                                                                        |
+| Active integration | The active runtime paths in this branch are the local-first application paths described above, including Auth.js fallback, local Ollama, local storage, Postgres/pgvector, and same-origin app routes.                                                                                |
+| Production-ready   | No production rollout is claimed by this README. Hosted CI/build success and local release verification must both be current before production language is used.                                                                                                                      |
+
 ## Features
 
 - Email/password authentication with protected routes
@@ -545,4 +561,8 @@ Semantic search is available at `/knowledge/search`. It embeds the query, compar
 
 ## Status
 
-Professional foundation project prepared for public GitHub sharing. It is suitable for local development and portfolio demonstration, with production hardening still expected before live deployment.
+Professional foundation project prepared for local development and portfolio
+demonstration. Production readiness is unverified until the release path in
+`docs/release/LOCAL_RELEASE_VERIFICATION.md` has current evidence for local AI,
+retrieval quality, citation validation, unavailable-runtime behavior, and
+optional voice fallback.
