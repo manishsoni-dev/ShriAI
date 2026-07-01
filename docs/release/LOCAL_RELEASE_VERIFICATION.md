@@ -17,13 +17,16 @@ npm run release:verify:local
 Use these labels consistently in README updates, release notes, demos, and
 portfolio copy:
 
-| Label            | Meaning                                                                                                                                  |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Implemented      | Code path exists in the repository and is covered by local tests or build checks.                                                        |
-| Staged           | Code path is present but depends on rollout flags, managed-service configuration, or human staging evidence before release.              |
-| Unverified       | Code path may exist, but this branch does not contain current end-to-end evidence proving it works in the target release environment.    |
-| Local-only       | Verification requires local trusted services such as Ollama, faster-whisper STT, Postgres/pgvector, and manual Voice QA evidence.        |
-| Production-ready | Do not use this label unless hosted CI, local release verification, staging checks, security review, and rollback notes are all current. |
+| Label              | Meaning                                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Implemented        | Code path exists in the repository and is covered by local tests or build checks.                                                           |
+| Verified           | A dated command, manual checklist, CI run, or other concrete evidence is recorded for the target branch or release environment.             |
+| Staged             | Code path is present but depends on rollout flags, managed-service configuration, or human staging evidence before release.                 |
+| Unverified         | Code path may exist, but this branch does not contain current end-to-end evidence proving it works in the target release environment.       |
+| Local-only         | Verification requires local trusted services such as Ollama, faster-whisper STT, Postgres/pgvector, and manual Voice QA evidence.           |
+| Provider boundary  | Provider setup, configuration, or adapter boundaries exist, but runtime product integration is not active until a scoped phase verifies it. |
+| Active integration | Runtime code actively uses the path in the current branch and the behavior is backed by current verification evidence.                      |
+| Production-ready   | Do not use this label unless hosted CI, local release verification, staging checks, security review, and rollback notes are all current.    |
 
 Required end-to-end proof for a truthful release claim:
 
@@ -31,9 +34,11 @@ Required end-to-end proof for a truthful release claim:
 2. Open chat and complete a typed guidance turn.
 3. Exercise retrieval against reviewed local corpus evidence.
 4. Verify citations are limited to retrieved/validated sources.
-5. Verify the local-AI unavailable state is truthful when Ollama is missing or
+5. Verify a conversation is saved and can be reloaded for the signed-in user.
+6. Verify the local-AI unavailable state is truthful when Ollama is missing or
    unhealthy.
-6. Optionally verify voice fallback: no microphone prompt before consent, safe
+7. Verify a failed document ingestion path reports a truthful failure state.
+8. Verify voice fallback: no microphone prompt before consent, safe
    typed fallback on denial or STT failure, and same-origin STT routing when
    allowed.
 

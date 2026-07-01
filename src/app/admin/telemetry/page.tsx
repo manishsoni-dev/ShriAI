@@ -135,7 +135,7 @@ export default async function TelemetryDashboard() {
           title="Local Runtime Usage"
           description="Performance and usage metrics for the local-first model runtime. Hosted-model spend is not estimated."
         />
-        <div className="grid gap-6 md:grid-cols-4">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-5">
           <KpiCard
             title="p50 Latency"
             value={`${latency.p50} ms`}
@@ -147,9 +147,9 @@ export default async function TelemetryDashboard() {
             description="95th percentile response time."
           />
           <KpiCard
-            title="Total Tokens Processed"
-            value={localRuntime.totalTokens.toLocaleString()}
-            description={`In: ${localRuntime.inputTokens.toLocaleString()} · Out: ${localRuntime.outputTokens.toLocaleString()}`}
+            title="Local Requests"
+            value={localRuntime.requestCount.toLocaleString()}
+            description={`${localRuntime.totalTokens.toLocaleString()} tokens logged locally`}
           />
           <KpiCard
             title="Local Runtime Errors"
